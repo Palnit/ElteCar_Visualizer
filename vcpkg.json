@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
+  "name": "gpgpuedgedetector",
+  "version": "0.0.1",
+  "dependencies": [
+    "opengl",
+    "glew",
+    "glm",
+    "sdl2",
+    {
+      "name": "sdl2-image",
+      "features": [
+        "libjpeg-turbo"
+      ]
+    },
+    {
+      "name": "imgui",
+      "features": [
+        "opengl3-binding",
+        "sdl2-binding",
+        "docking-experimental"
+      ]
+    },
+    "implot"
+  ]
+}

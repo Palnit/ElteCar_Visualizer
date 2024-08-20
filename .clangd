@@ -1,0 +1,6 @@
+CompileFlags:
+  CompilationDatabase: "cmake-build"
+  Add: [--cuda-gpu-arch=sm_86]
+  Remove:
+    - -forward-unknown-to-host-compiler
+    - --generate-code*
