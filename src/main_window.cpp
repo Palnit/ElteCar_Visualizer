@@ -7,6 +7,7 @@
 #include <semaphore.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include "cartesians.h"
 #include "general/OpenGL_SDL/element_buffer_object.h"
 #include "general/OpenGL_SDL/file_handling.h"
 #include "general/OpenGL_SDL/shader_program.h"
@@ -38,6 +39,10 @@ int MainWindow::Init() {
     m_reader2 = new SharedMemory::BufferedReader<SDL_Surface*>("Asd2", tmp);
     m_reader3 = new SharedMemory::BufferedReader<SDL_Surface*>("Asd3", tmp);
     m_reader4 = new SharedMemory::BufferedReader<SDL_Surface*>("Asd4", tmp);
+    m_csvReader = new SharedMemory::BufferedReader<cartesians>(
+        "Csv", [](void* pointer, int size) {
+            return cartesians(*(cartesians*) pointer);
+        });
 
     glGenTextures(1, &tex);
     glGenTextures(1, &tex2);
@@ -98,6 +103,8 @@ void MainWindow::Render() {
     glViewport(0, 0, m_width, m_height);
     glCullFace(GL_BACK);
     glClear(GL_COLOR_BUFFER_BIT);
+    cartesians cart = m_csvReader->readData();
+    std::cout << cart.ID << ":" << cart.Lon << std::endl;
     shaderProgram.Bind();
     VAO.Bind();
     if (m_image != nullptr) { SDL_FreeSurface(m_image); }

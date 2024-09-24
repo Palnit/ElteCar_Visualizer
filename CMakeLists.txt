@@ -41,6 +41,7 @@ set(HEADER_FILES
     include/general/OpenGL_SDL/shader_program.h
     include/general/SharedMemory/info.h
     include/main_window.h
+    include/cartesians.h
 )
 
 set(RESOURCES

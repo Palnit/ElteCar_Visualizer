@@ -2,6 +2,7 @@
 #define ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
 
 #include <SDL_surface.h>
+#include "cartesians.h"
 #include "general/OpenGL_SDL/basic_window.h"
 #include "general/OpenGL_SDL/shader_program.h"
 #include "general/OpenGL_SDL/vertex_array_object.h"
@@ -42,6 +43,7 @@ private:
     SharedMemory::BufferedReader<SDL_Surface*>* m_reader2;
     SharedMemory::BufferedReader<SDL_Surface*>* m_reader3;
     SharedMemory::BufferedReader<SDL_Surface*>* m_reader4;
+    SharedMemory::BufferedReader<cartesians>* m_csvReader;
     SDL_Surface* m_image;
     SDL_Surface* m_image2 = nullptr;
     SDL_Surface* m_image3 = nullptr;
