@@ -3,11 +3,6 @@
 #include <SDL_image.h>
 #include <SDL_rwops.h>
 #include <SDL_surface.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include "cartesians.h"
 #include "general/OpenGL_SDL/element_buffer_object.h"
 #include "general/OpenGL_SDL/file_handling.h"
 #include "general/OpenGL_SDL/shader_program.h"
