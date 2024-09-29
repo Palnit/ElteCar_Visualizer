@@ -28,7 +28,11 @@ public:
         : BasicWindow(title, x, y, w, h, flags),
           m_image(nullptr) {}
 
-    ~MainWindow() { delete m_threaded; }
+    ~MainWindow() {
+        delete m_threaded;
+        delete m_csvReader;
+        delete m_lidarReader;
+    }
 
     /*!
      * Implementation of the Init function of the base class

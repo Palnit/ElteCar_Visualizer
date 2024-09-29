@@ -3,6 +3,7 @@
 #include <SDL_rwops.h>
 #include <SDL_surface.h>
 #include <vector>
+#include "cartesians.h"
 #include "general/OpenGL_SDL/element_buffer_object.h"
 #include "general/OpenGL_SDL/file_handling.h"
 #include "general/OpenGL_SDL/shader_program.h"
@@ -32,14 +33,24 @@ SDL_Surface* tmp(void* pointer, int size) {
 
 std::vector<LidarData> tmp2(void* pointer, int size) {
     std::vector<LidarData> output;
-    for (int i = 0; i < size / sizeof(LidarData); i++) { LidarData data; }
+    LidarData* lidarPoiter = (LidarData*) pointer;
+    for (int i = 0; i < size / sizeof(LidarData); i++) {
+        output.push_back(*lidarPoiter);
+        lidarPoiter++;
+    }
+    return output;
 }
 
 int MainWindow::Init() {
 
     m_threaded = new SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>(
         "Images", tmp);
+    m_lidarReader =
+        new SharedMemory::BufferedReader<std::vector<LidarData>>("Lidar", tmp2);
+    m_csvReader = new SharedMemory::BufferedReader<cartesians>(
+        "Csv", [](void* pointer, int size) { return *(cartesians*) pointer; });
 
+    //for demonstration only
     glGenTextures(1, &tex);
     glGenTextures(1, &tex2);
     glGenTextures(1, &tex3);
@@ -107,8 +118,16 @@ void MainWindow::Render() {
         shaderProgram.UnBind();
         return;
     }
+    bool fail;
+    auto Lidar = m_lidarReader->readData(fail);
+    if (Lidar.size() > 0) { std::cout << "Lidar:" << Lidar[0].x << std::endl; }
+    auto Cart = m_csvReader->readData(fail);
+    std::cout << "Cartesians" << Cart.ID << Cart.Alt << std::endl;
+
+    //demosntration code only
     if (m_image != nullptr) { SDL_FreeSurface(m_image); }
     m_image = data[0];
+
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image->w, m_image->h, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, m_image->pixels);
