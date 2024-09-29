@@ -1,7 +1,8 @@
 #ifndef ELTECAR_DATASERVER_INCLUDE_GENERAL_SHAREDMEMORY_INFO_H
 #define ELTECAR_DATASERVER_INCLUDE_GENERAL_SHAREDMEMORY_INFO_H
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#if defined(WIN32) || defined(_WIN32) \
+    || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
 #else
 #include <semaphore.h>
@@ -9,7 +10,8 @@
 
 namespace SharedMemory {
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#if defined(WIN32) || defined(_WIN32) \
+    || defined(__WIN32) && !defined(__CYGWIN__)
 struct Info {
     int bufferNumber = 0;
     int infoBufferSize;
@@ -49,6 +51,13 @@ struct Info {
           bufferSize(-1),
           bufferNamesCount(-1) {}
 };
+
+struct ThreadedInfo {
+    int numberOfWriters;
+    int infoSize;
+    sem_t semaphore;
+};
+
 #endif
 }// namespace SharedMemory
 
