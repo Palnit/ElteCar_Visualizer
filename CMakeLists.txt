@@ -40,8 +40,10 @@ set(HEADER_FILES
     include/general/OpenGL_SDL/element_buffer_object.h
     include/general/OpenGL_SDL/shader_program.h
     include/general/SharedMemory/info.h
+    include/general/SharedMemory/threaded_multi_reader_handler.h
     include/main_window.h
     include/cartesians.h
+    include/lidar_data.h
 )
 
 set(RESOURCES

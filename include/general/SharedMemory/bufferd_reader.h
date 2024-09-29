@@ -201,8 +201,7 @@ public:
 
     bool initalize() {
 
-        int infoDescriptor =
-            shm_open(m_infoBufferName.c_str(), O_CREAT | O_RDWR, 0666);
+        int infoDescriptor = shm_open(m_infoBufferName.c_str(), O_RDWR, 0666);
 
         if (infoDescriptor == -1) {
             std::cout << "Shared Memory Open of Name: " << m_infoBufferName
@@ -271,30 +270,39 @@ public:
         return true;
     }
 
-    T readData() {
+    T readData(bool& failed) {
         if (!m_initalized) {
-            if ((m_initalized = initalize()) == false) {
-                std::cout << "failed to intialize reader" << std::endl;
-            }
+            if ((m_initalized = initalize()) == false) {}
+            failed = true;
+            return T();
         }
 
         if (sem_wait(&m_memoryInfo->semaphore) == -1) {
             std::cout << "Semaphore wait error: " << strerror(errno);
+            failed = true;
+            return T();
         }
         auto& [descript, pointer, sem] =
             m_memoryBuffer[m_memoryInfo->bufferNumber];
         if (sem_wait(sem) == -1) {
             std::cout << "Semaphore wait error: " << strerror(errno);
+            failed = true;
+            return T();
         }
         int size = m_memoryInfo->dataSize;
 
         T value = m_readerFunc(pointer, size);
         if (sem_post(sem) == -1) {
             std::cout << "Semaphore post error: " << strerror(errno);
+            failed = true;
+            return T();
         }
         if (sem_post(&m_memoryInfo->semaphore) == -1) {
             std::cout << "Semaphore post error: " << strerror(errno);
+            failed = true;
+            return T();
         }
+        failed = false;
         return value;
     }
 
