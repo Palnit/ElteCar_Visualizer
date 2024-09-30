@@ -2,10 +2,14 @@
 #define ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
 
 #include <SDL_surface.h>
+#include <vector>
+#include "cartesians.h"
 #include "general/OpenGL_SDL/basic_window.h"
 #include "general/OpenGL_SDL/shader_program.h"
 #include "general/OpenGL_SDL/vertex_array_object.h"
 #include "general/SharedMemory/bufferd_reader.h"
+#include "general/SharedMemory/threaded_multi_reader_handler.h"
+#include "lidar_data.h"
 
 class MainWindow : public BasicWindow {
 
@@ -24,7 +28,11 @@ public:
         : BasicWindow(title, x, y, w, h, flags),
           m_image(nullptr) {}
 
-    ~MainWindow() { delete m_reader; }
+    ~MainWindow() {
+        delete m_threaded;
+        delete m_csvReader;
+        delete m_lidarReader;
+    }
 
     /*!
      * Implementation of the Init function of the base class
@@ -38,10 +46,9 @@ public:
     void Render() override;
 
 private:
-    SharedMemory::BufferedReader<SDL_Surface*>* m_reader;
-    SharedMemory::BufferedReader<SDL_Surface*>* m_reader2;
-    SharedMemory::BufferedReader<SDL_Surface*>* m_reader3;
-    SharedMemory::BufferedReader<SDL_Surface*>* m_reader4;
+    SharedMemory::BufferedReader<cartesians>* m_csvReader;
+    SharedMemory::BufferedReader<std::vector<LidarData>>* m_lidarReader;
+    SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>* m_threaded;
     SDL_Surface* m_image;
     SDL_Surface* m_image2 = nullptr;
     SDL_Surface* m_image3 = nullptr;

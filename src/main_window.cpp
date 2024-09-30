@@ -1,18 +1,17 @@
 #include "main_window.h"
-
 #include <SDL_image.h>
 #include <SDL_rwops.h>
 #include <SDL_surface.h>
-#include <fcntl.h>
-#include <semaphore.h>
-#include <sys/mman.h>
-#include <unistd.h>
+#include <vector>
+#include "cartesians.h"
 #include "general/OpenGL_SDL/element_buffer_object.h"
 #include "general/OpenGL_SDL/file_handling.h"
 #include "general/OpenGL_SDL/shader_program.h"
 #include "general/OpenGL_SDL/vertex_array_object.h"
 #include "general/OpenGL_SDL/vertex_buffer_object.h"
 #include "general/SharedMemory/bufferd_reader.h"
+#include "general/SharedMemory/threaded_multi_reader_handler.h"
+#include "lidar_data.h"
 
 SDL_Surface* tmp(void* pointer, int size) {
     SDL_RWops* rwops = SDL_RWFromConstMem(pointer, size);
@@ -32,13 +31,26 @@ SDL_Surface* tmp(void* pointer, int size) {
     return image;
 }
 
+std::vector<LidarData> tmp2(void* pointer, int size) {
+    std::vector<LidarData> output;
+    LidarData* lidarPoiter = (LidarData*) pointer;
+    for (int i = 0; i < size / sizeof(LidarData); i++) {
+        output.push_back(*lidarPoiter);
+        lidarPoiter++;
+    }
+    return output;
+}
+
 int MainWindow::Init() {
 
-    m_reader = new SharedMemory::BufferedReader<SDL_Surface*>("Asd", tmp);
-    m_reader2 = new SharedMemory::BufferedReader<SDL_Surface*>("Asd2", tmp);
-    m_reader3 = new SharedMemory::BufferedReader<SDL_Surface*>("Asd3", tmp);
-    m_reader4 = new SharedMemory::BufferedReader<SDL_Surface*>("Asd4", tmp);
+    m_threaded = new SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>(
+        "Images", tmp);
+    m_lidarReader =
+        new SharedMemory::BufferedReader<std::vector<LidarData>>("Lidar", tmp2);
+    m_csvReader = new SharedMemory::BufferedReader<cartesians>(
+        "Csv", [](void* pointer, int size) { return *(cartesians*) pointer; });
 
+    //for demonstration only
     glGenTextures(1, &tex);
     glGenTextures(1, &tex2);
     glGenTextures(1, &tex3);
@@ -100,8 +112,22 @@ void MainWindow::Render() {
     glClear(GL_COLOR_BUFFER_BIT);
     shaderProgram.Bind();
     VAO.Bind();
+    auto data = m_threaded->ReadMultiMemory();
+    if (data.empty()) {
+        VAO.UnBind();
+        shaderProgram.UnBind();
+        return;
+    }
+    bool fail;
+    auto Lidar = m_lidarReader->readData(fail);
+    if (Lidar.size() > 0) { std::cout << "Lidar:" << Lidar[0].x << std::endl; }
+    auto Cart = m_csvReader->readData(fail);
+    std::cout << "Cartesians" << Cart.ID << Cart.Alt << std::endl;
+
+    //demosntration code only
     if (m_image != nullptr) { SDL_FreeSurface(m_image); }
-    m_image = m_reader->readData();
+    m_image = data[0];
+
     glBindTexture(GL_TEXTURE_2D, tex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image->w, m_image->h, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, m_image->pixels);
@@ -114,7 +140,7 @@ void MainWindow::Render() {
 
     VAO2.Bind();
     if (m_image2 != nullptr) { SDL_FreeSurface(m_image2); }
-    m_image2 = m_reader2->readData();
+    m_image2 = data[1];
     glBindTexture(GL_TEXTURE_2D, tex2);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image2->w, m_image2->h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, m_image2->pixels);
@@ -127,7 +153,7 @@ void MainWindow::Render() {
 
     VAO3.Bind();
     if (m_image3 != nullptr) { SDL_FreeSurface(m_image3); }
-    m_image3 = m_reader3->readData();
+    m_image3 = data[2];
     glBindTexture(GL_TEXTURE_2D, tex3);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image3->w, m_image3->h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, m_image3->pixels);
@@ -140,7 +166,7 @@ void MainWindow::Render() {
 
     VAO4.Bind();
     if (m_image4 != nullptr) { SDL_FreeSurface(m_image4); }
-    m_image4 = m_reader4->readData();
+    m_image4 = data[3];
     glBindTexture(GL_TEXTURE_2D, tex4);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image4->w, m_image4->h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, m_image4->pixels);
