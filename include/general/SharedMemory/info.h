@@ -31,6 +31,10 @@ struct Info {
           bufferSize(-1),
           bufferNamesCount(-1) {}
 };
+struct ThreadedInfo {
+    int numberOfWriters;
+    int infoSize;
+};
 #else
 struct Info {
     int bufferNumber = 0;

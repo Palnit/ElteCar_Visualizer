@@ -73,7 +73,7 @@ public:
             return false;
         }
 
-        switch (WaitForSingleObject(m_infoSem, 1000)) {
+        switch (WaitForSingleObject(m_infoSem, 10)) {
             case WAIT_ABANDONED:
                 std::cout << "Semaphore wait Abandoned: " << std::endl;
                 return false;
@@ -133,49 +133,59 @@ public:
         return true;
     }
 
-    T readData() {
+    T readData(bool& failed) {
         if (!m_initalized) {
             if ((m_initalized = initalize()) == false) {
-                std::cout << "failed to intialize reader" << std::endl;
+                failed = true;
+                return T();
             }
         }
 
-        switch (WaitForSingleObject(m_infoSem, 1000)) {
+        switch (WaitForSingleObject(m_infoSem, 10)) {
             case WAIT_ABANDONED:
                 std::cout << "Semaphore wait Abandoned: " << std::endl;
-                return false;
+                failed = true;
+                return T();
             case WAIT_TIMEOUT:
                 std::cout << "Semaphore wait Timeout: " << std::endl;
-                return false;
+                failed = true;
+                return T();
             case WAIT_FAILED:
                 std::cout << "Semaphore wait Failed: " << std::endl;
-                return false;
+                failed = true;
+                return T();
         }
 
         auto& [descript, pointer, sem] =
             m_memoryBuffer[m_memoryInfo->bufferNumber];
-        switch (WaitForSingleObject(sem, 1000)) {
+        switch (WaitForSingleObject(sem, 10)) {
             case WAIT_ABANDONED:
                 std::cout << "Semaphore wait Abandoned: " << std::endl;
-                return false;
+                failed = true;
+                return T();
             case WAIT_TIMEOUT:
                 std::cout << "Semaphore wait Timeout: " << std::endl;
-                return false;
+                failed = true;
+                return T();
             case WAIT_FAILED:
                 std::cout << "Semaphore wait Fail: " << std::endl;
-                return false;
+                failed = true;
+                return T();
         }
         int size = m_memoryInfo->dataSize;
 
         T value = m_readerFunc(pointer, size);
         if (!ReleaseSemaphore(sem, 1, nullptr)) {
             std::cout << "Semaphore post error: " << GetLastError();
-            return false;
+            failed = true;
+            return T();
         }
         if (!ReleaseSemaphore(m_infoSem, 1, nullptr)) {
             std::cout << "Semaphore post error: " << GetLastError();
-            return false;
+            failed = true;
+            return T();
         }
+        failed = false;
         return value;
     }
 

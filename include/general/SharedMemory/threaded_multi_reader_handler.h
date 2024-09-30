@@ -10,6 +10,148 @@
 
 namespace SharedMemory {
 
+#if defined(WIN32) || defined(_WIN32) \
+    || defined(__WIN32) && !defined(__CYGWIN__)
+
+template<class T>
+class ThreadedMultiReaderHandler {
+
+public:
+    ThreadedMultiReaderHandler(std::string bufferName,
+                               std::function<T(void*, int)> readerFunc)
+        : m_infoBufferName(bufferName),
+          m_readerFunc(readerFunc) {}
+
+    ~ThreadedMultiReaderHandler() {
+        UnmapViewOfFile(m_memoryInfo);
+        CloseHandle(m_infoDescriptor);
+        CloseHandle(m_infoSem);
+    }
+
+    bool initalize() {
+
+        m_infoDescriptor = OpenFileMapping(FILE_MAP_ALL_ACCESS, true,
+                                           m_infoBufferName.c_str());
+
+        if (m_infoDescriptor == nullptr) {
+            std::cout << "Shared Memory Open of Name: " << m_infoBufferName
+                      << " failed error: " << GetLastError() << std::endl;
+            return false;
+        }
+
+        m_memoryInfo = (SharedMemory::ThreadedInfo*) MapViewOfFile(
+            m_infoDescriptor, FILE_MAP_ALL_ACCESS, 0, 0,
+            sizeof(SharedMemory::ThreadedInfo));
+        if (m_memoryInfo == nullptr) {
+            std::cout << "Shared Memory Mapping of name: " << m_infoBufferName
+                      << " failed error: " << GetLastError() << std::endl;
+            return false;
+        }
+
+        std::string infoSemName = m_infoBufferName + "_sem";
+        m_infoSem =
+            OpenSemaphore(SEMAPHORE_ALL_ACCESS, true, infoSemName.c_str());
+        if (m_infoSem == nullptr) {
+            std::cout
+                << "Initalization of Semaphore for shared memory of name: "
+                << m_infoBufferName << " failed errror: " << GetLastError()
+                << std::endl;
+            return false;
+        }
+
+        switch (WaitForSingleObject(m_infoSem, 10)) {
+            case WAIT_ABANDONED:
+                std::cout << "Semaphore wait Abandoned: " << std::endl;
+                return false;
+            case WAIT_TIMEOUT:
+                std::cout << "Semaphore wait Timeout: " << std::endl;
+                return false;
+            case WAIT_FAILED:
+                std::cout << "Semaphore wait Failed: " << std::endl;
+                return false;
+        }
+
+        char* infoPointer = (char*) (m_memoryInfo + 1);
+
+        for (int i = 0; i < m_memoryInfo->numberOfWriters; ++i) {
+            std::string name(infoPointer);
+            infoPointer = infoPointer + name.length() + 1;
+
+            m_readers.push_back(
+                SharedMemory::BufferedReader<T>(name, m_readerFunc));
+        }
+        if (!ReleaseSemaphore(m_infoSem, 1, nullptr)) {
+            std::cout << "Semaphore post error: " << GetLastError();
+            return false;
+        }
+        return true;
+    }
+
+    std::vector<T> ReadMultiMemory() {
+
+        if (!m_initalized) {
+            if ((m_initalized = initalize()) == false) {
+                return std::vector<T>();
+            }
+        }
+
+        switch (WaitForSingleObject(m_infoSem, 10)) {
+            case WAIT_ABANDONED:
+                std::cout << "Semaphore wait Abandoned: " << std::endl;
+                return std::vector<T>();
+            case WAIT_TIMEOUT:
+                std::cout << "Semaphore wait Timeout: " << std::endl;
+                return std::vector<T>();
+            case WAIT_FAILED:
+                std::cout << "Semaphore wait Failed: " << std::endl;
+                return std::vector<T>();
+        }
+
+        std::vector<std::thread> threads;
+        std::vector<std::future<std::tuple<T, bool> > > futures;
+
+        for (SharedMemory::BufferedReader<T>& reader : m_readers) {
+            std::promise<std::tuple<T, bool> > promise;
+            futures.push_back(promise.get_future());
+            std::thread thread(
+                [](SharedMemory::BufferedReader<T>& reader,
+                   std::promise<std::tuple<T, bool> > promise) {
+                    bool error;
+                    T data = reader.readData(error);
+                    promise.set_value(std::make_tuple(data, error));
+                },
+                std::ref(reader), std::move(promise));
+
+            threads.push_back(std::move(thread));
+        }
+        std::vector<T> output;
+        bool failed = false;
+        for (auto& future : futures) {
+            auto [data, error] = future.get();
+            if (error) { failed = true; }
+            output.push_back(data);
+        }
+        for (auto& thread : threads) { thread.join(); }
+
+        if (!ReleaseSemaphore(m_infoSem, 1, nullptr)) {
+            std::cout << "Semaphore post error: " << GetLastError();
+            return std::vector<T>();
+        }
+        if (failed) { return std::vector<T>(); }
+
+        return output;
+    }
+
+private:
+    std::function<T(void*, int)> m_readerFunc;
+    std::vector<SharedMemory::BufferedReader<T> > m_readers;
+    std::string m_infoBufferName;
+    HANDLE m_infoSem = nullptr;
+    HANDLE m_infoDescriptor = nullptr;
+    SharedMemory::ThreadedInfo* m_memoryInfo;
+    bool m_initalized = false;
+};
+#else
 template<class T>
 class ThreadedMultiReaderHandler {
 
@@ -83,14 +225,14 @@ public:
         }
 
         std::vector<std::thread> threads;
-        std::vector<std::future<std::tuple<T, bool>>> futures;
+        std::vector<std::future<std::tuple<T, bool> > > futures;
 
         for (SharedMemory::BufferedReader<T>& reader : m_readers) {
-            std::promise<std::tuple<T, bool>> promise;
+            std::promise<std::tuple<T, bool> > promise;
             futures.push_back(promise.get_future());
             std::thread thread(
                 [](SharedMemory::BufferedReader<T>& reader,
-                   std::promise<std::tuple<T, bool>> promise) {
+                   std::promise<std::tuple<T, bool> > promise) {
                     bool error;
                     T data = reader.readData(error);
                     promise.set_value(std::make_tuple(data, error));
@@ -119,11 +261,12 @@ public:
 
 private:
     std::function<T(void*, int)> m_readerFunc;
-    std::vector<SharedMemory::BufferedReader<T>> m_readers;
+    std::vector<SharedMemory::BufferedReader<T> > m_readers;
     std::string m_infoBufferName;
     SharedMemory::ThreadedInfo* m_memoryInfo;
     bool m_initalized = false;
 };
+#endif
 
 }// namespace SharedMemory
 #endif// ELTECAR_VISUALIZER_INCLUDE_GENERAL_SHAREDMEMORY_THREADED_MULTI_READER_HANDLER_H
