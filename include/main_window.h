@@ -46,7 +46,7 @@ public:
     void Render() override;
 
 private:
-    SharedMemory::BufferedReader<cartesians>* m_csvReader;
+    SharedMemory::BufferedReader<Cartesians>* m_csvReader;
     SharedMemory::BufferedReader<std::vector<LidarData>>* m_lidarReader;
     SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>* m_threaded;
     SDL_Surface* m_image;
