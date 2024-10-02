@@ -13,21 +13,35 @@ namespace SharedMemory {
 #if defined(WIN32) || defined(_WIN32) \
     || defined(__WIN32) && !defined(__CYGWIN__)
 
+/// \class ThreadedMultiReaderHandler
+/// \brief This class splits multiple buffered readers into separate threads
+/// and syncs them tougether
+/// @tparam T The return type of all the buffered readers
 template<class T>
 class ThreadedMultiReaderHandler {
 
 public:
+
+    /// Constructor
+    /// @param bufferName Name of the threaded readers info buffer
+    /// @param readerFunc The callback function that handels reading from the memory
+    /// the function must be of type T(void*, int) replecated to all buffered readers
     ThreadedMultiReaderHandler(std::string bufferName,
                                std::function<T(void*, int)> readerFunc)
         : m_infoBufferName(bufferName),
           m_readerFunc(readerFunc) {}
 
+    /// Deconstructor to handle windows unmaping
     ~ThreadedMultiReaderHandler() {
         UnmapViewOfFile(m_memoryInfo);
         CloseHandle(m_infoDescriptor);
         CloseHandle(m_infoSem);
     }
 
+    /// Handels the initializations of all shared memory and semaphores
+    /// associated whit this threaded reader handler and initializes all the
+    /// buffered readers
+    /// @return error check
     bool initalize() {
 
         m_infoDescriptor = OpenFileMapping(FILE_MAP_ALL_ACCESS, true,
@@ -87,6 +101,11 @@ public:
         return true;
     }
 
+    /// Splits into threads all the buffered readers and syncs their
+    /// reading speeding up the shared memory handling while syncing mutliple
+    /// data points of the same type
+    /// @return a vector containing all the readers readMemory return values
+    /// in order that was given when initializing the writer
     std::vector<T> ReadMultiMemory() {
 
         if (!m_initalized) {
@@ -152,15 +171,28 @@ private:
     bool m_initalized = false;
 };
 #else
+
+/// \class ThreadedMultiReaderHandler
+/// \brief This class splits multiple buffered readers into separate threads
+/// and syncs them tougether
+/// @tparam T The return type of all the buffered readers
 template<class T>
 class ThreadedMultiReaderHandler {
 
 public:
+    /// Constructor
+    /// @param bufferName Name of the threaded readers info buffer
+    /// @param readerFunc The callback function that handels reading from the memory
+    /// the function must be of type T(void*, int) replecated to all buffered readers
     ThreadedMultiReaderHandler(std::string bufferName,
                                std::function<T(void*, int)> readerFunc)
         : m_infoBufferName(bufferName),
           m_readerFunc(readerFunc) {}
 
+    /// Handels the initializations of all shared memory and semaphores
+    /// associated whit this threaded reader handler and initializes all the
+    /// buffered readers
+    /// @return error check
     bool initalize() {
 
         int infoDescriptor = shm_open(m_infoBufferName.c_str(), O_RDWR, 0666);
@@ -211,6 +243,11 @@ public:
         return true;
     }
 
+    /// Splits into threads all the buffered readers and syncs their
+    /// reading speeding up the shared memory handling while syncing mutliple
+    /// data points of the same type
+    /// @return a vector containing all the readers readMemory return values
+    /// in order that was given when initializing the writer
     std::vector<T> ReadMultiMemory() {
 
         if (!m_initalized) {

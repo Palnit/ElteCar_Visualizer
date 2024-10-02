@@ -13,6 +13,10 @@
 #include "general/SharedMemory/threaded_multi_reader_handler.h"
 #include "lidar_data.h"
 
+/// temporary function to read sdl_surface from shm
+/// @param pointer pointer to shared memory
+/// @param size size of shared memory
+/// @return the returned sdl_surface pointer
 SDL_Surface* tmp(void* pointer, int size) {
     SDL_RWops* rwops = SDL_RWFromConstMem(pointer, size);
 
@@ -30,7 +34,10 @@ SDL_Surface* tmp(void* pointer, int size) {
     SDL_FreeSurface(LoadedImg);
     return image;
 }
-
+/// temporary function to get lidar data array
+/// @param pointer pointer to shared memory
+/// @param size size of shared memory
+/// @return the returned lidar array
 std::vector<LidarData> tmp2(void* pointer, int size) {
     std::vector<LidarData> output;
     LidarData* lidarPoiter = (LidarData*) pointer;
@@ -45,10 +52,12 @@ int MainWindow::Init() {
 
     m_threaded = new SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>(
         "Images", tmp);
+
     m_lidarReader =
         new SharedMemory::BufferedReader<std::vector<LidarData>>("Lidar", tmp2);
-    m_csvReader = new SharedMemory::BufferedReader<cartesians>(
-        "Csv", [](void* pointer, int size) { return *(cartesians*) pointer; });
+
+    m_csvReader = new SharedMemory::BufferedReader<Cartesians>(
+        "Csv", [](void* pointer, int size) { return *(Cartesians*) pointer; });
 
     //for demonstration only
     glGenTextures(1, &tex);

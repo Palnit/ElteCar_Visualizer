@@ -23,14 +23,27 @@ namespace SharedMemory {
 #if defined(WIN32) || defined(_WIN32) \
     || defined(__WIN32) && !defined(__CYGWIN__)
 
+/// \class BufferedReader
+/// \brief This class es responsible to reading from a shared memory
+/// @tparam T The type of the data that the reader is suposed to return
+///
+/// This class handels all reading from a specific shared memory
+/// the by default double buffering of the shared memory is handled automaticly
+/// only the name of the info buffer is needed everything else is donne automaticly
 template<class T>
 class BufferedReader {
 public:
+    /// Constructor
+    /// @param infoBufferName Name of the info buffer buffer must be created by
+    /// a BufferedWriter
+    /// @param readerFunc The callback function that handels reading from the memory
+    /// the function must be of type T(void*, int)
     BufferedReader(const std::string& infoBufferName,
                    std::function<T(void*, int)> readerFunc)
         : m_readerFunc(readerFunc),
           m_infoBufferName(infoBufferName) {}
 
+    /// Deconstructor to unmap windows shared memory
     ~BufferedReader() {
         UnmapViewOfFile(m_memoryInfo);
         CloseHandle(m_infoDescriptor);
@@ -42,6 +55,9 @@ public:
         }
     }
 
+    /// Handels the initializations of all shared memory and semaphores
+    /// associated whit this reader
+    /// @return error check
     bool initalize() {
 
         m_infoDescriptor = OpenFileMapping(FILE_MAP_ALL_ACCESS, true,
@@ -133,6 +149,11 @@ public:
         return true;
     }
 
+    /// Handels reading from shared memory buffering is handeled automaticly
+    /// only when the writer changes buffer number does it give a different
+    /// data back calls the callback function and returns the value from it
+    /// @param failed error chek
+    /// @return The read and proccesed data
     T readData(bool& failed) {
         if (!m_initalized) {
             if ((m_initalized = initalize()) == false) {
@@ -201,14 +222,30 @@ private:
 };
 
 #else
+
+/// \class BufferedReader
+/// \brief This class es responsible to reading from a shared memory
+/// @tparam T The type of the data that the reader is suposed to return
+///
+/// This class handels all reading from a specific shared memory
+/// the by default double buffering of the shared memory is handled automaticly
+/// only the name of the info buffer is needed everything else is donne automaticly
 template<class T>
 class BufferedReader {
 public:
+    /// Constructor
+    /// @param infoBufferName Name of the info buffer buffer must be created by
+    /// a BufferedWriter
+    /// @param readerFunc The callback function that handels reading from the memory
+    /// the function must be of type T(void*, int)
     BufferedReader(const std::string& infoBufferName,
                    std::function<T(void*, int)> readerFunc)
         : m_readerFunc(readerFunc),
           m_infoBufferName(infoBufferName) {}
 
+    /// Handels the initializations of all shared memory and semaphores
+    /// associated whit this reader
+    /// @return error check
     bool initalize() {
 
         int infoDescriptor = shm_open(m_infoBufferName.c_str(), O_RDWR, 0666);
@@ -280,6 +317,11 @@ public:
         return true;
     }
 
+    /// Handels reading from shared memory buffering is handeled automaticly
+    /// only when the writer changes buffer number does it give a different
+    /// data back calls the callback function and returns the value from it
+    /// @param failed error chek
+    /// @return The read and proccesed data
     T readData(bool& failed) {
         if (!m_initalized) {
             if ((m_initalized = initalize()) == false) {}
