@@ -129,9 +129,12 @@ void MainWindow::Render() {
     }
     bool fail;
     auto Lidar = m_lidarReader->readData(fail);
-    if (Lidar.size() > 0) { std::cout << "Lidar:" << Lidar[0].x << std::endl; }
+    if (Lidar.size() > 0) {
+        std::cout << "Lidar:" << Lidar.size() << std::endl;
+    }
     auto Cart = m_csvReader->readData(fail);
-    std::cout << "Cartesians" << Cart.ID << Cart.Alt << std::endl;
+    std::cout << "Cartesians ID: " << Cart.ID << " Alt: " << Cart.Alt
+              << std::endl;
 
     //demosntration code only
     if (m_image != nullptr) { SDL_FreeSurface(m_image); }

@@ -288,7 +288,7 @@ public:
             void* pointer;
             sem_t* sem = (sem_t*) (infoPointer + name.length() + 1);
 
-            int descript = shm_open(name.c_str(), O_CREAT | O_RDWR, 0666);
+            int descript = shm_open(name.c_str(), O_RDWR, 0666);
 
             if (descript == -1) {
                 std::cout << "Shared Memory Open of Name: " << name
@@ -324,12 +324,13 @@ public:
     /// @return The read and proccesed data
     T readData(bool& failed) {
         if (!m_initalized) {
-            if ((m_initalized = initalize()) == false) {}
-            failed = true;
-            return T();
+            if ((m_initalized = initalize()) == false) {
+                failed = true;
+                return T();
+            }
         }
 
-        if (sem_wait(&m_memoryInfo->semaphore) == -1) {
+            if (sem_wait(&m_memoryInfo->semaphore) == -1) {
             std::cout << "Semaphore wait error: " << strerror(errno);
             failed = true;
             return T();
@@ -364,7 +365,7 @@ private:
     SharedMemory::Info* m_memoryInfo;
     std::string m_infoBufferName;
     int m_size;
-    bool m_initalized;
+    bool m_initalized = false;
 };
 #endif
 }// namespace SharedMemory
