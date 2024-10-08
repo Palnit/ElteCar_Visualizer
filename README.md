@@ -1,4 +1,5 @@
 <h1 align=center>ElteCar Visualizer</h1>
+<h2 align=center>This project is right now a proof of concept and only exists to prove that the data server works as it should be</h2>
 
 <p align=center>This project visualizes the data from Eötvös Lorand University's self-driving car's camera and lidar data</p>
 <p align=center>this is only a client you need a data server providing data trough shared memory for this to work properly</p>
