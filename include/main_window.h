@@ -1,17 +1,17 @@
 #ifndef ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
 #define ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
 
-#include <SDL_surface.h>
+#include <SDL3/SDL_surface.h>
 #include <vector>
 #include "cartesians.h"
-#include "general/OpenGL_SDL/basic_window.h"
-#include "general/OpenGL_SDL/shader_program.h"
-#include "general/OpenGL_SDL/vertex_array_object.h"
+#include <HUH/Graphics/basic_window.h>
+#include <HUH/Graphics/shader_program.h>
+#include <HUH/Graphics/vertex_array_object.h>
 #include "general/SharedMemory/bufferd_reader.h"
 #include "general/SharedMemory/threaded_multi_reader_handler.h"
 #include "lidar_data.h"
 
-class MainWindow : public BasicWindow {
+class MainWindow : public HUH::BasicWindow {
 
 public:
     /*!
@@ -57,18 +57,18 @@ private:
     GLuint tex2;
     GLuint tex3;
     GLuint tex4;
-    VertexArrayObject VAO;
-    VertexArrayObject VAO2;
-    VertexArrayObject VAO3;
-    VertexArrayObject VAO4;
-    VertexBufferObject<float> VBO;
-    VertexBufferObject<float> VBO2;
-    VertexBufferObject<float> VBO3;
-    VertexBufferObject<float> VBO4;
-    ElementBufferObject EBO;
+    HUH::VertexArrayObject VAO;
+    HUH::VertexArrayObject VAO2;
+    HUH::VertexArrayObject VAO3;
+    HUH::VertexArrayObject VAO4;
+    HUH::VertexBufferObject<float> VBO;
+    HUH::VertexBufferObject<float> VBO2;
+    HUH::VertexBufferObject<float> VBO3;
+    HUH::VertexBufferObject<float> VBO4;
+    HUH::ElementBufferObject EBO;
     GLuint vertexShader;
     GLuint fragmentShader;
-    ShaderProgram shaderProgram;
+    HUH::ShaderProgram shaderProgram;
 };
 
 #endif// ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H

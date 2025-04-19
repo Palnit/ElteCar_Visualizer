@@ -1,0 +1,3 @@
+[submodule "lib/HUH"]
+	path = lib/HUH
+	url = git@github.com:Palnit/HUH.git

@@ -19,26 +19,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PROJECT_SOURCES
    src/main.cpp
-    src/general/OpenGL_SDL/basic_window.cpp
-    src/general/OpenGL_SDL/SDL_GLDebugMessageCallback.cpp
-    src/general/OpenGL_SDL/file_handling.cpp
-    src/general/OpenGL_SDL/generic_structs.cpp
-    src/general/OpenGL_SDL/vertex_buffer_object.cpp
-    src/general/OpenGL_SDL/vertex_array_object.cpp
-    src/general/OpenGL_SDL/element_buffer_object.cpp
-    src/general/OpenGL_SDL/shader_program.cpp
     src/main_window.cpp
 )
 
 set(HEADER_FILES
-    include/general/OpenGL_SDL/basic_window.h
-    include/general/OpenGL_SDL/SDL_GLDebugMessageCallback.h
-    include/general/OpenGL_SDL/file_handling.h
-    include/general/OpenGL_SDL/generic_structs.h
-    include/general/OpenGL_SDL/vertex_buffer_object.h
-    include/general/OpenGL_SDL/vertex_array_object.h
-    include/general/OpenGL_SDL/element_buffer_object.h
-    include/general/OpenGL_SDL/shader_program.h
     include/general/SharedMemory/info.h
     include/general/SharedMemory/threaded_multi_reader_handler.h
     include/main_window.h
@@ -51,13 +35,8 @@ set(RESOURCES
     shaders/default_vertex.vert
 )
 
-find_package(SDL2 CONFIG REQUIRED)
-find_package(SDL2_image CONFIG REQUIRED)
-find_package(GLEW REQUIRED)
-find_package(glm CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-find_package(OpenGL REQUIRED)
-find_package(implot CONFIG REQUIRED)
+set(BUILD_GRAPHICS ON)
+add_subdirectory(lib/HUH)
 
 add_executable(Visualizer
     ${PROJECT_SOURCES}
@@ -66,14 +45,7 @@ add_executable(Visualizer
 
 
 target_link_libraries(Visualizer PRIVATE
-        $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
-        $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
-        $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,SDL2_image::SDL2_image-static>
-        imgui::imgui
-        GLEW::GLEW
-        glm::glm
-        OpenGL::GL
-        implot::implot
+        HUH::Graphics
 )
 
 target_include_directories(Visualizer

@@ -1,14 +1,9 @@
 #include "main_window.h"
-#include <SDL_image.h>
-#include <SDL_rwops.h>
-#include <SDL_surface.h>
+#include <SDL3/SDL_surface.h>
+#include <SDL3_image/SDL_image.h>
 #include <vector>
+#include "HUH/Graphics/file_handling.h"
 #include "cartesians.h"
-#include "general/OpenGL_SDL/element_buffer_object.h"
-#include "general/OpenGL_SDL/file_handling.h"
-#include "general/OpenGL_SDL/shader_program.h"
-#include "general/OpenGL_SDL/vertex_array_object.h"
-#include "general/OpenGL_SDL/vertex_buffer_object.h"
 #include "general/SharedMemory/bufferd_reader.h"
 #include "general/SharedMemory/threaded_multi_reader_handler.h"
 #include "lidar_data.h"
@@ -18,20 +13,20 @@
 /// @param size size of shared memory
 /// @return the returned sdl_surface pointer
 SDL_Surface* tmp(void* pointer, int size) {
-    SDL_RWops* rwops = SDL_RWFromConstMem(pointer, size);
+    SDL_IOStream* rwops = SDL_IOFromConstMem(pointer, size);
 
-    SDL_Surface* LoadedImg = IMG_Load_RW(rwops, 0);
+    SDL_Surface* LoadedImg = IMG_Load_IO(rwops, 0);
 
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
-    uint32_t format = SDL_PIXELFORMAT_ABGR8888;
+    SDL_PixelFormat format = SDL_PIXELFORMAT_ABGR8888;
 #else
-    uint32_t format = SDL_PIXELFORMAT_RGBA8888;
+    SDL_PixelFormat format = SDL_PIXELFORMAT_RGBA8888;
 #endif
 
     SDL_Surface* image;
-    image = SDL_ConvertSurfaceFormat(LoadedImg, format, 0);
+    image = SDL_ConvertSurface(LoadedImg, format);
 
-    SDL_FreeSurface(LoadedImg);
+    SDL_DestroySurface(LoadedImg);
     return image;
 }
 /// temporary function to get lidar data array
@@ -86,10 +81,10 @@ int MainWindow::Init() {
     VBO4.AddElement(verts4);
     EBO.AddElement({2, 3, 1, 3, 0, 1});
 
-    vertexShader = FileHandling::LoadShader(GL_VERTEX_SHADER,
+    vertexShader = HUH::FileHandling::LoadShader(GL_VERTEX_SHADER,
                                             "shaders/default_vertex.vert");
 
-    fragmentShader = FileHandling::LoadShader(GL_FRAGMENT_SHADER,
+    fragmentShader = HUH::FileHandling::LoadShader(GL_FRAGMENT_SHADER,
                                               "shaders/default_fragment.frag");
 
     shaderProgram.AttachShader(vertexShader);
@@ -137,7 +132,7 @@ void MainWindow::Render() {
               << std::endl;
 
     //demosntration code only
-    if (m_image != nullptr) { SDL_FreeSurface(m_image); }
+    if (m_image != nullptr) { SDL_DestroySurface(m_image); }
     m_image = data[0];
 
     glBindTexture(GL_TEXTURE_2D, tex);
@@ -151,7 +146,7 @@ void MainWindow::Render() {
     VAO.UnBind();
 
     VAO2.Bind();
-    if (m_image2 != nullptr) { SDL_FreeSurface(m_image2); }
+    if (m_image2 != nullptr) { SDL_DestroySurface(m_image2); }
     m_image2 = data[1];
     glBindTexture(GL_TEXTURE_2D, tex2);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image2->w, m_image2->h, 0,
@@ -164,7 +159,7 @@ void MainWindow::Render() {
     VAO2.UnBind();
 
     VAO3.Bind();
-    if (m_image3 != nullptr) { SDL_FreeSurface(m_image3); }
+    if (m_image3 != nullptr) { SDL_DestroySurface(m_image3); }
     m_image3 = data[2];
     glBindTexture(GL_TEXTURE_2D, tex3);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image3->w, m_image3->h, 0,
@@ -177,7 +172,7 @@ void MainWindow::Render() {
     VAO3.UnBind();
 
     VAO4.Bind();
-    if (m_image4 != nullptr) { SDL_FreeSurface(m_image4); }
+    if (m_image4 != nullptr) { SDL_DestroySurface(m_image4); }
     m_image4 = data[3];
     glBindTexture(GL_TEXTURE_2D, tex4);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, m_image4->w, m_image4->h, 0,

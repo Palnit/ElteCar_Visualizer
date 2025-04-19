@@ -6,18 +6,21 @@
     "opengl",
     "glew",
     "glm",
-    "sdl2",
+    "sdl3",
     {
-      "name": "sdl2-image",
+      "name": "sdl3-image",
       "features": [
-        "libjpeg-turbo"
+        "jpeg",
+        "png",
+        "tiff",
+        "webp"
       ]
     },
     {
       "name": "imgui",
       "features": [
         "opengl3-binding",
-        "sdl2-binding",
+        "sdl3-binding",
         "docking-experimental"
       ]
     },
