@@ -1,12 +1,14 @@
 #ifndef ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
 #define ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
 
-#include <SDL3/SDL_surface.h>
-#include <vector>
-#include "cartesians.h"
 #include <HUH/Graphics/basic_window.h>
 #include <HUH/Graphics/shader_program.h>
 #include <HUH/Graphics/vertex_array_object.h>
+#include <SDL3/SDL_surface.h>
+#include <vector>
+#include "HUH/Graphics/camera.h"
+#include "HUH/Graphics/texture.h"
+#include "cartesians.h"
 #include "general/SharedMemory/bufferd_reader.h"
 #include "general/SharedMemory/threaded_multi_reader_handler.h"
 #include "lidar_data.h"
@@ -26,12 +28,17 @@ public:
      */
     MainWindow(const char* title, int x, int y, int w, int h, Uint32 flags)
         : BasicWindow(title, x, y, w, h, flags),
-          m_image(nullptr) {}
+          m_image(nullptr),
+          m_camera(glm::vec3(0.0f, 0.0f, -3.0f)) {
+        m_camera.SetAspect(static_cast<float>(m_width)
+                           / static_cast<float>(m_height));
+    }
 
     ~MainWindow() {
         delete m_threaded;
         delete m_csvReader;
         delete m_lidarReader;
+        for (const auto Params : m_textureParams) { delete Params; }
     }
 
     /*!
@@ -44,6 +51,10 @@ public:
      * Implementation of the Render function of the base class
      */
     void Render() override;
+    void KeyboardDown(const SDL_KeyboardEvent& ev) override;
+    void KeyboardUp(const SDL_KeyboardEvent& ev) override;
+    void MouseMove(const SDL_MouseMotionEvent& ev) override;
+    void Update() override;
 
 private:
     SharedMemory::BufferedReader<Cartesians>* m_csvReader;
@@ -53,10 +64,6 @@ private:
     SDL_Surface* m_image2 = nullptr;
     SDL_Surface* m_image3 = nullptr;
     SDL_Surface* m_image4 = nullptr;
-    GLuint tex;
-    GLuint tex2;
-    GLuint tex3;
-    GLuint tex4;
     HUH::VertexArrayObject VAO;
     HUH::VertexArrayObject VAO2;
     HUH::VertexArrayObject VAO3;
@@ -66,9 +73,11 @@ private:
     HUH::VertexBufferObject<float> VBO3;
     HUH::VertexBufferObject<float> VBO4;
     HUH::ElementBufferObject EBO;
+    std::vector<HUH::ITextureParameters*> m_textureParams;
     GLuint vertexShader;
     GLuint fragmentShader;
     HUH::ShaderProgram shaderProgram;
+    HUH::Camera m_camera;
 };
 
 #endif// ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
