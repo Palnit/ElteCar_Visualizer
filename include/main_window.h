@@ -76,8 +76,14 @@ private:
     std::vector<HUH::ITextureParameters*> m_textureParams;
     GLuint vertexShader;
     GLuint fragmentShader;
+    GLuint vertexShaderLidar;
+    GLuint fragmentShaderLidar;
     HUH::ShaderProgram shaderProgram;
+    HUH::ShaderProgram shaderProgramLidar;
     HUH::Camera m_camera;
+    bool first = true;
+    HUH::VertexArrayObject VAOLidar;
+    HUH::VertexBufferObject<float> VBOLidar;
 };
 
 #endif// ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H

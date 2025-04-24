@@ -2,6 +2,7 @@
 #include <SDL3/SDL_surface.h>
 #include <SDL3_image/SDL_image.h>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
 #include <vector>
 
 #include "HUH/Graphics/file_handling.h"
@@ -27,6 +28,7 @@ std::vector<LidarData> LidarReader(void* pointer, int size) {
 }
 
 int MainWindow::Init() {
+    glEnable(GL_PROGRAM_POINT_SIZE);
     m_textureParams.push_back(new HUH::TextureParameters(
         glTexParameteri, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
     m_textureParams.emplace_back(new HUH::TextureParameters(
@@ -72,8 +74,16 @@ int MainWindow::Init() {
     fragmentShader = HUH::FileHandling::LoadShader(
         GL_FRAGMENT_SHADER, "shaders/default_fragment.frag");
 
+    vertexShaderLidar =
+        HUH::FileHandling::LoadShader(GL_VERTEX_SHADER, "shaders/lidar.vert");
+
+    fragmentShaderLidar =
+        HUH::FileHandling::LoadShader(GL_FRAGMENT_SHADER, "shaders/lidar.frag");
+
     shaderProgram.AttachShader(vertexShader);
     shaderProgram.AttachShader(fragmentShader);
+    shaderProgramLidar.AttachShader(vertexShaderLidar);
+    shaderProgramLidar.AttachShader(fragmentShaderLidar);
 
     VBO.AddAttribute({{3, 5 * sizeof(float), (void*) 0},
                       {2, 5 * sizeof(float), (void*) (3 * sizeof(float))}});
@@ -91,6 +101,11 @@ int MainWindow::Init() {
     VAO3.AddElementBuffer(EBO);
     VAO4.AddVertexBuffer(VBO4);
     VAO4.AddElementBuffer(EBO);
+
+    VBOLidar.AddAttribute(
+        {{3, 6 * sizeof(float), (void*) 0},
+         {3, 6 * sizeof(float), (void*) (3 * sizeof(float))}});
+    VAOLidar.AddVertexBuffer(VBOLidar);
     return 0;
 }
 
@@ -99,6 +114,48 @@ void MainWindow::Render() {
     glViewport(0, 0, m_width, m_height);
     // glCullFace(GL_BACK);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    bool fail;
+    auto Lidar = m_lidarReader->readData(fail);
+    if (!Lidar.empty()) {
+        VBOLidar.Clear();
+        size_t i = 0;
+        for (auto lidar : Lidar) {
+            if (first) {
+                std::cout << i << ":" << lidar.x << " " << lidar.y << " "
+                          << lidar.z << std::endl;
+            }
+            // if (i >= 100) { break; }
+            VBOLidar.AddElement(static_cast<float>(lidar.x));
+            VBOLidar.AddElement(static_cast<float>(lidar.y));
+            VBOLidar.AddElement(static_cast<float>(lidar.z));
+            VBOLidar.AddElement(1.0f);
+            VBOLidar.AddElement(0.0f);
+            VBOLidar.AddElement(0.0f);
+            i++;
+        }
+        if (first) { first = false; }
+        shaderProgramLidar.Bind();
+
+        auto model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(-90.0f),
+                            glm::vec3(1.0f, 0.0f, 0.0f));
+        shaderProgramLidar.SetUniform("model", glUniformMatrix4fv, 1, GL_FALSE,
+                                      &model[0][0]);
+        glm::mat4 view = m_camera.GetViewMatrix();
+        shaderProgramLidar.SetUniform("view", glUniformMatrix4fv, 1, GL_FALSE,
+                                      &view[0][0]);
+        glm::mat4 projection = m_camera.GetProjectionMatrix();
+        shaderProgramLidar.SetUniform("projection", glUniformMatrix4fv, 1,
+                                      GL_FALSE, &projection[0][0]);
+        VAOLidar.Bind();
+        VBOLidar.Bind();
+        glDrawArrays(GL_POINTS, 0, Lidar.size());
+        VBO.UnBind();
+        VAOLidar.UnBind();
+        shaderProgramLidar.UnBind();
+    }
+
     shaderProgram.Bind();
     glm::mat4 model = glm::mat4(1.0f);
     shaderProgram.SetUniform("model", glUniformMatrix4fv, 1, GL_FALSE,
@@ -116,11 +173,6 @@ void MainWindow::Render() {
         shaderProgram.UnBind();
         return;
     }
-    bool fail;
-    auto Lidar = m_lidarReader->readData(fail);
-    // if (Lidar.size() > 0) {
-    //     std::cout << "Lidar:" << Lidar.size() << std::endl;
-    // }
     // auto Cart = m_csvReader->readData(fail);
     // std::cout << "Cartesians ID: " << Cart.ID << " Alt: " << Cart.Alt
     //           << std::endl;

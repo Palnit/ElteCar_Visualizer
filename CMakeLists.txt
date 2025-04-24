@@ -18,29 +18,31 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 
 set(PROJECT_SOURCES
-   src/main.cpp
-    src/main_window.cpp
+        src/main.cpp
+        src/main_window.cpp
 )
 
 set(HEADER_FILES
-    include/general/SharedMemory/info.h
-    include/general/SharedMemory/threaded_multi_reader_handler.h
-    include/main_window.h
-    include/cartesians.h
-    include/lidar_data.h
+        include/general/SharedMemory/info.h
+        include/general/SharedMemory/threaded_multi_reader_handler.h
+        include/main_window.h
+        include/cartesians.h
+        include/lidar_data.h
 )
 
 set(RESOURCES
-    shaders/default_fragment.frag
-    shaders/default_vertex.vert
+        shaders/default_fragment.frag
+        shaders/default_vertex.vert
+        shaders/lidar.frag
+        shaders/lidar.vert
 )
 
 set(BUILD_GRAPHICS ON)
 add_subdirectory(lib/HUH)
 
 add_executable(Visualizer
-    ${PROJECT_SOURCES}
-    ${HEADER_FILES}
+        ${PROJECT_SOURCES}
+        ${HEADER_FILES}
 )
 
 
@@ -49,13 +51,13 @@ target_link_libraries(Visualizer PRIVATE
 )
 
 target_include_directories(Visualizer
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 
 install(TARGETS Visualizer
-    BUNDLE DESTINATION .
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        BUNDLE DESTINATION .
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 
