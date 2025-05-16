@@ -24,6 +24,8 @@
         "docking-experimental"
       ]
     },
-    "implot"
+    "implot",
+    "libosmium",
+    "pcl"
   ]
 }

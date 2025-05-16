@@ -13,20 +13,6 @@
 #include "general/SharedMemory/threaded_multi_reader_handler.h"
 #include "lidar_data.h"
 
-/// temporary function to get lidar data array
-/// @param pointer pointer to shared memory
-/// @param size size of shared memory
-/// @return the returned lidar array
-std::vector<LidarData> LidarReader(void* pointer, int size) {
-    std::vector<LidarData> output;
-    const auto* LidarPointer = static_cast<LidarData*>(pointer);
-    for (int i = 0; i < size / sizeof(LidarData); i++) {
-        output.push_back(*LidarPointer);
-        LidarPointer++;
-    }
-    return output;
-}
-
 int MainWindow::Init() {
     glEnable(GL_PROGRAM_POINT_SIZE);
     m_textureParams.push_back(new HUH::TextureParameters(
@@ -36,14 +22,6 @@ int MainWindow::Init() {
 
     m_threaded = new SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>(
         "Images", HUH::FileHandling::LoadImageFromMemory);
-
-    m_lidarReader = new SharedMemory::BufferedReader<std::vector<LidarData>>(
-        "Lidar", LidarReader);
-
-    m_csvReader = new SharedMemory::BufferedReader<Cartesians>(
-        "Csv", [](void* pointer, int size) {
-            return *static_cast<Cartesians*>(pointer);
-        });
 
     //for demonstration only
     float verts[] = {-1.0f, 0.0f, 0.0f, 0.0f, 1.0f, -1.0f, 1.0f,
@@ -106,6 +84,10 @@ int MainWindow::Init() {
         {{3, 6 * sizeof(float), (void*) 0},
          {3, 6 * sizeof(float), (void*) (3 * sizeof(float))}});
     VAOLidar.AddVertexBuffer(VBOLidar);
+    VBOLidarPrev.AddAttribute(
+        {{3, 6 * sizeof(float), (void*) 0},
+         {3, 6 * sizeof(float), (void*) (3 * sizeof(float))}});
+    VAOLidarPrev.AddVertexBuffer(VBOLidarPrev);
     return 0;
 }
 
@@ -115,26 +97,36 @@ void MainWindow::Render() {
     // glCullFace(GL_BACK);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    bool fail;
-    auto Lidar = m_lidarReader->readData(fail);
-    if (!Lidar.empty()) {
+    auto Lidar = m_slamCreator.GetLidarData();
+    if (Lidar != nullptr && !Lidar->empty()) {
         VBOLidar.Clear();
+        VBOLidarPrev.Clear();
         size_t i = 0;
-        for (auto lidar : Lidar) {
-            if (first) {
-                std::cout << i << ":" << lidar.x << " " << lidar.y << " "
-                          << lidar.z << std::endl;
-            }
+        for (auto data : *Lidar) {
+            // if (first) {
+            //     std::cout << i << ":" << data.x << " " << data.y << " "
+            //               << data.z << std::endl;
+            // }
             // if (i >= 100) { break; }
-            VBOLidar.AddElement(static_cast<float>(lidar.x));
-            VBOLidar.AddElement(static_cast<float>(lidar.y));
-            VBOLidar.AddElement(static_cast<float>(lidar.z));
+            VBOLidar.AddElement(data.x);
+            VBOLidar.AddElement(data.y);
+            VBOLidar.AddElement(data.z);
             VBOLidar.AddElement(1.0f);
             VBOLidar.AddElement(0.0f);
             VBOLidar.AddElement(0.0f);
             i++;
         }
-        if (first) { first = false; }
+        if (!first) {
+            for (auto data : *m_prev) {
+                VBOLidarPrev.AddElement(data.x);
+                VBOLidarPrev.AddElement(data.y);
+                VBOLidarPrev.AddElement(data.z);
+                VBOLidarPrev.AddElement(0.0f);
+                VBOLidarPrev.AddElement(0.0f);
+                VBOLidarPrev.AddElement(1.0f);
+            }
+        }
+        m_prev = Lidar;
         shaderProgramLidar.Bind();
 
         auto model = glm::mat4(1.0f);
@@ -150,10 +142,18 @@ void MainWindow::Render() {
                                       GL_FALSE, &projection[0][0]);
         VAOLidar.Bind();
         VBOLidar.Bind();
-        glDrawArrays(GL_POINTS, 0, Lidar.size());
-        VBO.UnBind();
+        glDrawArrays(GL_POINTS, 0, Lidar->size());
+        VBOLidar.UnBind();
         VAOLidar.UnBind();
+        if (!first) {
+            VAOLidarPrev.Bind();
+            VBOLidarPrev.Bind();
+            glDrawArrays(GL_POINTS, 0, m_prev->size());
+            VBOLidarPrev.UnBind();
+            VAOLidarPrev.UnBind();
+        }
         shaderProgramLidar.UnBind();
+        if (first) { first = false; }
     }
 
     shaderProgram.Bind();
@@ -173,11 +173,7 @@ void MainWindow::Render() {
         shaderProgram.UnBind();
         return;
     }
-    // auto Cart = m_csvReader->readData(fail);
-    // std::cout << "Cartesians ID: " << Cart.ID << " Alt: " << Cart.Alt
-    //           << std::endl;
 
-    //demosntration code only
     if (m_image != nullptr) { SDL_DestroySurface(m_image); }
     m_image = data[0];
 

@@ -5,12 +5,13 @@
 /// Contains the values from one row of the csv file
 struct Cartesians {
     int ID;
-    float Lat;
-    float Lon;
-    float Alt;
-    float Vel;
-    float Ax, Ay, Az;
-    float Mx, My, Mz;
+    double Lat;
+    double Lon;
+    double Alt;
+    double Vel;
+    double Roll, Pitch, Yaw;
+    double Ax, Ay, Az;
+    double Mx, My, Mz;
 };
 
 #endif// ELTECAR_DATASERVER_INCLUDE_CARTESIANS_H

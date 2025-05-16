@@ -330,7 +330,7 @@ public:
             }
         }
 
-            if (sem_wait(&m_memoryInfo->semaphore) == -1) {
+        if (sem_wait(&m_memoryInfo->semaphore) == -1) {
             std::cout << "Semaphore wait error: " << strerror(errno);
             failed = true;
             return T();
@@ -343,6 +343,12 @@ public:
             return T();
         }
         int size = m_memoryInfo->dataSize;
+        if (size > m_size) {
+            munmap(pointer, m_size);
+            m_size = size;
+            pointer = mmap(pointer, m_size, PROT_READ | PROT_WRITE, MAP_SHARED,
+                           descript, 0);
+        }
 
         T value = m_readerFunc(pointer, size);
         if (sem_post(sem) == -1) {

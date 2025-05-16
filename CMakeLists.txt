@@ -6,13 +6,14 @@ FetchContent_Declare(vcpkg
 )
 FetchContent_MakeAvailable(vcpkg)
 
+set(ENV{VCPKG_MAX_CONCURRENCY} 6)
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 set(VCPKG_TRACE_FIND_PACKAGE true)
 
 project(Visualizer VERSION 0.1 LANGUAGES CXX)
 
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -20,6 +21,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(PROJECT_SOURCES
         src/main.cpp
         src/main_window.cpp
+        src/general/slam_creater.cpp
 )
 
 set(HEADER_FILES
@@ -28,6 +30,7 @@ set(HEADER_FILES
         include/main_window.h
         include/cartesians.h
         include/lidar_data.h
+        include/general/slam_creater.h
 )
 
 set(RESOURCES
@@ -39,6 +42,11 @@ set(RESOURCES
 
 set(BUILD_GRAPHICS ON)
 add_subdirectory(lib/HUH)
+set(Boost_USE_DEBUG_RUNTIME OFF)
+set(VTK_MODULE_ENABLE_VTK_FiltersExtraction ON)
+find_package(VTK)
+find_package(PCL CONFIG REQUIRED)
+find_path(OSMIUM_INCLUDE_DIRS "osmium/version.hpp")
 
 add_executable(Visualizer
         ${PROJECT_SOURCES}
@@ -48,10 +56,12 @@ add_executable(Visualizer
 
 target_link_libraries(Visualizer PRIVATE
         HUH::Graphics
+        ${PCL_LIBRARIES}
 )
 
 target_include_directories(Visualizer
         PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+        PRIVATE ${OSMIUM_INCLUDE_DIRS}
 )
 
 

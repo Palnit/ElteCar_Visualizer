@@ -11,6 +11,7 @@
 #include "cartesians.h"
 #include "general/SharedMemory/bufferd_reader.h"
 #include "general/SharedMemory/threaded_multi_reader_handler.h"
+#include "general/slam_creater.h"
 #include "lidar_data.h"
 
 class MainWindow : public HUH::BasicWindow {
@@ -36,8 +37,6 @@ public:
 
     ~MainWindow() {
         delete m_threaded;
-        delete m_csvReader;
-        delete m_lidarReader;
         for (const auto Params : m_textureParams) { delete Params; }
     }
 
@@ -57,8 +56,6 @@ public:
     void Update() override;
 
 private:
-    SharedMemory::BufferedReader<Cartesians>* m_csvReader;
-    SharedMemory::BufferedReader<std::vector<LidarData>>* m_lidarReader;
     SharedMemory::ThreadedMultiReaderHandler<SDL_Surface*>* m_threaded;
     SDL_Surface* m_image;
     SDL_Surface* m_image2 = nullptr;
@@ -83,7 +80,11 @@ private:
     HUH::Camera m_camera;
     bool first = true;
     HUH::VertexArrayObject VAOLidar;
+    HUH::VertexArrayObject VAOLidarPrev;
     HUH::VertexBufferObject<float> VBOLidar;
+    HUH::VertexBufferObject<float> VBOLidarPrev;
+    SlamCreator m_slamCreator;
+    SlamCreator::PointCloud::Ptr m_prev;
 };
 
 #endif// ELTECAR_VISUALIZER_INCLUDE_MAIN_WINDOW_H
