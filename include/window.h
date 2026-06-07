@@ -37,16 +37,22 @@ private:
     void InitializeVertexBuffers();
     void InitializeUniformBuffers();
 
-    std::vector<Vertex> m_imagePlane{{{0, -0.25f, 0.25f}, {0, 1}},
-                                     {{0, 0.25f, 0.25f}, {0, 0}},
-                                     {{0, 0.25f, -0.25f}, {1, 0}},
-                                     {{0, -0.25f, -0.25f}, {1, 1}}};
+    void WindowResize(HUH::Window* win, HUH::Vector2u32 size);
+    void ReadImages();
+    bool ReadLidar();
+    void RecordImageBufferCopy();
+
+    std::vector<Vertex> m_imagePlane{{{0, -1.f, 1.f}, {0, 0}},
+                                     {{0, 1.f, 1.f}, {1, 0}},
+                                     {{0, 1.f, -1.f}, {1, 1}},
+                                     {{0, -1.f, -1.f}, {0, 1}}};
 
     std::vector<HUH::Uint32> m_imageIndices = {0, 1, 2, 2, 3, 0};
 
     HUH::Window m_window;
     HUH::Graphics::Time m_time;
     HUH::Graphics::Camera m_camera;
+    HUH::Vector2u32 m_viewportSize;
     size_t frame_index = 0;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;
@@ -68,9 +74,12 @@ private:
     HUH::RHI::Pipeline* m_imPipeline = nullptr;
     HUH::RHI::Pipeline* m_lidarPipeline = nullptr;
 
-    std::vector<std::vector<HUH::RHI::Buffer*>> m_imagesTransferBuffer;
-    std::vector<HUH::RHI::Image*> m_imageBuffers;
-    std::vector<HUH::RHI::Buffer*> m_imUniformModelBuffers;
+    std::vector<std::vector<HUH::RHI::Buffer*>> m_imUniformModelBuffers;
+    std::vector<std::vector<HUH::RHI::Barrier*>> m_imBarrierDst;
+    std::vector<std::vector<HUH::RHI::Barrier*>> m_imBarrierOpt;
+
+    std::vector<std::vector<HUH::RHI::Buffer*>> m_imImagesTransferBuffer;
+    std::vector<std::vector<HUH::RHI::Image*>> m_imImageBuffers;
 
     std::vector<HUH::RHI::Buffer*> m_lidarUniformModelBuffers;
 
@@ -78,8 +87,9 @@ private:
     HUH::RHI::Buffer* m_imIndicesBuffer = nullptr;
 
     std::vector<HUH::RHI::Buffer*> m_lidarVertexBuffers;
+    std::vector<size_t> m_lidarSizes;
 
-    SharedMemory::ThreadedMultiReaderHandler<HUH::Image>* m_threaded;
+    SharedMemory::ThreadedMultiReaderHandler<HUH::Image>* m_imageReader;
     SharedMemory::BufferedReader<Cartesians>* m_csvReader;
     SharedMemory::BufferedReader<std::vector<LidarVertex>>* m_lidarReader;
 };
