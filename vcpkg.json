@@ -3,29 +3,20 @@
   "name": "gpgpuedgedetector",
   "version": "0.0.1",
   "dependencies": [
-    "opengl",
-    "glew",
     "glm",
-    "sdl3",
-    {
-      "name": "sdl3-image",
-      "features": [
-        "jpeg",
-        "png",
-        "tiff",
-        "webp"
-      ]
-    },
     {
       "name": "imgui",
       "features": [
-        "opengl3-binding",
-        "sdl3-binding",
+        "vulkan-binding",
         "docking-experimental"
       ]
     },
     "implot",
-    "libosmium",
-    "pcl"
+    {
+      "name": "libjpeg-turbo"
+    },
+    {
+      "name": "libpng"
+    }
   ]
 }
