@@ -251,8 +251,8 @@ public:
         int infoDescriptor = shm_open(m_infoBufferName.c_str(), O_RDWR, 0666);
 
         if (infoDescriptor == -1) {
-            std::cout << "Shared Memory Open of Name: " << m_infoBufferName
-                      << " failed error: " << strerror(errno) << std::endl;
+            // std::cout << "Shared Memory Open of Name: " << m_infoBufferName
+            //           << " failed error: " << strerror(errno) << std::endl;
             return false;
         }
 

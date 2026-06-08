@@ -31,6 +31,13 @@ static std::vector<char> readFile(const std::string& filename) {
     return buffer;
 }
 
+MainWindow::~MainWindow() {
+    delete m_imageReader;
+    delete m_lidarReader;
+    delete m_csvReader;
+    m_cudaGpu->Destroy();
+}
+
 MainWindow::MainWindow() : m_window("Elte Car Visualizer", {1024, 720}) {
     m_imageReader = new SharedMemory::ThreadedMultiReaderHandler<HUH::Image>("Images", [](void* pointer, int size) {
         // TODO no copy ?
@@ -61,7 +68,23 @@ MainWindow::MainWindow() : m_window("Elte Car Visualizer", {1024, 720}) {
     for (auto device : devices) {
         if (device->Information.type == HUH::RHI::Device::Type::Dedicated) {
             m_gpu = device;
+            m_cudaGpu = HUH::Cuda::Device::CreateFromRHI(m_gpu);
+            if (!m_cudaGpu) {
+                continue;
+            }
             break;
+        }
+    }
+
+    if (m_gpu == nullptr) {
+        throw std::runtime_error("No suitable Gpu found");
+    }
+
+    m_cudaGpu->ActivateDevice();
+
+    if (m_cudaModule.Load("plane_ransac.ptx")) {
+        for (auto& func : m_cudaModule.GetFunctions()) {
+            HUH_TLOG("Functions Name: {}", func.Name)
         }
     }
 

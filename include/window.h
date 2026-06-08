@@ -1,7 +1,10 @@
 #pragma once
 
+#include "HUH/Cuda/module.h"
 #include "cartesians.h"
 #include "lidar_data.h"
+
+#include <HUH/Cuda/device.h>
 
 #include <HUH/Math/matrix.h>
 #include "HUH/FileHandling/Image/image.h"
@@ -28,6 +31,7 @@ public:
         HUH::Matrix4x4f proj = HUH::Matrix4x4f::Identity();
     };
     MainWindow();
+    ~MainWindow();
     int Run();
 
 private:
@@ -52,8 +56,11 @@ private:
     HUH::Window m_window;
     HUH::Graphics::Time m_time;
     HUH::Graphics::Camera m_camera;
-    HUH::Vector2u32 m_viewportSize;
+    HUH::Vector2u32 m_viewportSize{1024, 720};
     size_t frame_index = 0;
+
+    HUH::Cuda::Device* m_cudaGpu = nullptr;
+    HUH::Cuda::Module m_cudaModule;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;
     HUH::RHI::Device* m_gpu = nullptr;
