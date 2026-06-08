@@ -7,7 +7,7 @@ struct LidarVertex {
 
 extern "C" {
 
-__global__ void PlaneRansac(LidarVertex* vertices) {
-    vertices[threadIdx.x].pos = {0, 0, 1};
+__global__ void PlaneRansac(LidarVertex* vertices, HUH::Vector3f color) {
+    vertices[threadIdx.x].color = color;
 }
 }

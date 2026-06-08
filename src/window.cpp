@@ -16,6 +16,8 @@
 
 #include <fstream>
 
+inline HUH::LogCategory AppLog("Application");
+
 static std::vector<char> readFile(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
@@ -77,13 +79,33 @@ MainWindow::MainWindow() : m_window("Elte Car Visualizer", {1024, 720}) {
     }
 
     if (m_gpu == nullptr) {
-        throw std::runtime_error("No suitable Gpu found");
+        HUH_WLOG(AppLog, "No Suitable Gpu found Falling back to 0 gpu")
+        m_gpu = devices[0];
     }
 
     m_cudaGpu->ActivateDevice();
 
+    HUH::Vector3i test = {4, 1, 1};
+    HUH::Vector3i test2 = {1, 1, 1};
     if (m_cudaModule.Load("plane_ransac.ptx")) {
         for (auto& func : m_cudaModule.GetFunctions()) {
+            func.SetBlock(test);
+            func.SetGrid(test2);
+            LidarVertex* data;
+            cudaMallocManaged(&data, 4 * sizeof(LidarVertex));
+            for (size_t i = 0; i < 4; ++i) {
+                data[i].pos = test;
+                data[i].color = test;
+                HUH_TLOG("ORiginal COlor: {}", data[i].color)
+            }
+
+            func.Execute(data, HUH::Vector3f(0, 0, 1));
+
+            cudaDeviceSynchronize();
+            for (size_t i = 0; i < 4; ++i) {
+                HUH_TLOG("Changed COlor: {}", data[i].color)
+            }
+
             HUH_TLOG("Functions Name: {}", func.Name)
         }
     }
@@ -120,6 +142,7 @@ int MainWindow::Run() {
     auto fence = m_gpu->CreateFence(2);
     auto fenceS = m_gpu->CreateFence(2);
     auto fenceS2 = m_gpu->CreateFence(2);
+    auto fenceCuda = m_gpu->CreateFence(2);
 
     while (m_window.Loop()) {
         ReadImages();
@@ -156,6 +179,7 @@ int MainWindow::Run() {
                                                           {0, static_cast<HUH::Int32>(m_viewportSize.Y() / 2)},
                                                           {m_viewportSize.X(), m_viewportSize.Y() / 2});
         if (lidarFound) {
+            m_cudaMemoryAllocator.MapRHIBuffer(m_lidarVertexBuffers[frame_index]);
             (*m_mainCommandPool)[frame_index]->BindPipeline(m_lidarPipeline);
             CameraData cameraData(m_camera.GetViewMatrix(), m_camera.GetPerspectiveProjectionMatrix());
             m_lidarUniformModelBuffers[frame_index]->UploadData(&cameraData);

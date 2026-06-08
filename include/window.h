@@ -1,5 +1,6 @@
 #pragma once
 
+#include "HUH/Cuda/memory_allocator.h"
 #include "HUH/Cuda/module.h"
 #include "cartesians.h"
 #include "lidar_data.h"
@@ -61,6 +62,7 @@ private:
 
     HUH::Cuda::Device* m_cudaGpu = nullptr;
     HUH::Cuda::Module m_cudaModule;
+    HUH::Cuda::MemoryAllocator m_cudaMemoryAllocator;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;
     HUH::RHI::Device* m_gpu = nullptr;
