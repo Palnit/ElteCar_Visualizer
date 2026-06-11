@@ -16,6 +16,8 @@
 #include <HUH/RHI/fwd.h>
 #include <HUH/Window/window.h>
 
+inline HUH::LogCategory LogVisualizer("Visualizer");
+
 class MainWindow {
 public:
     struct Vertex {
@@ -47,6 +49,8 @@ private:
     bool ReadLidar();
     void RecordImageBufferCopy();
 
+    HUH::Cuda::Function LoadCudaRNGFunction();
+
     std::vector<Vertex> m_imagePlane{{{0, -1.f, 1.f}, {0, 0}},
                                      {{0, 1.f, 1.f}, {1, 0}},
                                      {{0, 1.f, -1.f}, {1, 1}},
@@ -62,6 +66,8 @@ private:
 
     HUH::Cuda::Device* m_cudaGpu = nullptr;
     HUH::Cuda::Module m_cudaModule;
+    HUH::Cuda::Function m_cudaLidarColor;
+    HUH::Cuda::Function m_cudaPlaneRng;
     HUH::Cuda::MemoryAllocator m_cudaMemoryAllocator;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;

@@ -7,6 +7,12 @@ FetchContent_Declare(vcpkg
 )
 FetchContent_MakeAvailable(vcpkg)
 
+FetchContent_Declare(mathdx
+        URL "https://developer.nvidia.com/downloads/compute/cuRANDDx/redist/cuRANDDx/cuda13/nvidia-mathdx-26.03.0-cuda13.tar.gz"
+        DOWNLOAD_EXTRACT_TIMESTAMP NEW
+)
+FetchContent_MakeAvailable(mathdx)
+
 set(ENV{VCPKG_MAX_CONCURRENCY} 6)
 set(CMAKE_TOOLCHAIN_FILE "${vcpkg_SOURCE_DIR}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
 set(VCPKG_TRACE_FIND_PACKAGE true)
@@ -59,7 +65,8 @@ add_executable(Visualizer
 )
 
 find_package(CUDA)
-if (CUDA_FOUND)
+find_package(mathdx COMPONENTS curanddx CONFIG PATHS "${mathdx_SOURCE_DIR}/nvidia/mathdx/26.03/")
+if (CUDA_FOUND AND mathdx_FOUND)
     enable_language(CUDA)
     #    set(CMAKE_CUDA23_STANDARD_COMPILE_OPTION "-std=c++23")
     #    set(CMAKE_CUDA23_EXTENSION_COMPILE_OPTION "")
@@ -70,7 +77,7 @@ if (CUDA_FOUND)
     add_library(CudaPtxFiles OBJECT cuda_kernels/plane_ransac.cu)
     set_property(TARGET CudaPtxFiles PROPERTY CUDA_PTX_COMPILATION ON)
     #    target_compile_options(CudaPtxFiles PRIVATE --std=c++23 -O0)
-    target_link_libraries(CudaPtxFiles PUBLIC HUH::Math)
+    target_link_libraries(CudaPtxFiles PUBLIC HUH::Math mathdx::curanddx)
 
     add_custom_command(TARGET Visualizer POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
