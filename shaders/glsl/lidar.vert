@@ -6,13 +6,13 @@ layout (row_major, binding = 0) uniform Camera {
 } ubo;
 
 
-layout (location = 0) in vec3 inPosition;
-layout (location = 1) in vec3 inColor;
+layout (location = 0) in vec4 inPosition;
+layout (location = 1) in vec4 inColor;
 
-layout (location = 0) out vec3 fragColor;
+layout (location = 0) out vec4 fragColor;
 
 void main() {
-    gl_Position = vec4(inPosition, 1.0) * ubo.view * ubo.proj;
+    gl_Position = inPosition * ubo.view * ubo.proj;
     gl_PointSize = 3.f;
     fragColor = inColor;
 }

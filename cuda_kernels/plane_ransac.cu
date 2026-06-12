@@ -1,9 +1,10 @@
 #include <HUH/Math/vector.h>
+#include <cuda/atomic>
 #include <curanddx.hpp>
 
 struct LidarVertex {
-    HUH::Vector3f pos;
-    HUH::Vector3f color;
+    alignas(16) HUH::Vector4f pos;
+    alignas(16) HUH::Vector4f color;
 };
 using RNG750 = decltype(curanddx::Generator<curanddx::philox4_32>() + curanddx::SM<750>() + curanddx::Thread());
 using RNG800 = decltype(curanddx::Generator<curanddx::philox4_32>() + curanddx::SM<800>() + curanddx::Thread());
@@ -63,18 +64,141 @@ DEFINE_RANDOM_PLANE_KERNEL(1100)
 DEFINE_RANDOM_PLANE_KERNEL(1200)
 DEFINE_RANDOM_PLANE_KERNEL(1210)
 
-__global__ void PlaneRansac(LidarVertex* vertices,
-                            HUH::Uint32 count,
-                            HUH::Vector3f color,
-                            HUH::Vector4f* planes,
-                            HUH::Uint64 num_inliners) {
+HUH_FORCE_INLINE __device__ HUH::Uint32 warpReduceSum(HUH::Uint32 val) {
+
+    for (int offset = 16; offset > 0; offset /= 2) {
+        val += __shfl_down_sync(0xffffffff, val, offset);
+    }
+    return val;
+}
+
+__global__ void PlaneRansacSum(LidarVertex* vertices,
+                               HUH::Uint32 count,
+                               HUH::Vector4f* planes,
+                               HUH::Uint32* inlinersSum,
+                               HUH::Uint32* inliners,
+                               float threshold) {
+    auto workIndex = threadIdx.x + blockDim.x * blockIdx.x;
+    auto planeIndex = blockDim.y * blockIdx.y;
+
+    HUH::Uint32 isInliner = 0;
+    if (workIndex >= count) {
+        return;
+    }
+
+    __shared__ HUH::Uint32 blockLocal[32];
+
+    // printf("distance: %f\n",
+    //        abs(fmaf(planes[planeIndex].X(), vertices[workIndex].pos.X(),
+    //                 fmaf(planes[planeIndex].Y(), vertices[workIndex].pos.Y(),
+    //                      fmaf(planes[planeIndex].Z(), vertices[workIndex].pos.Z(), planes[planeIndex].W()))))
+    //            * rnorm3df(planes[planeIndex].X(), planes[planeIndex].Y(), planes[planeIndex].Z()));
+
+    isInliner = abs(fmaf(planes[planeIndex].X(), vertices[workIndex].pos.X(),
+                         fmaf(planes[planeIndex].Y(), vertices[workIndex].pos.Y(),
+                              fmaf(planes[planeIndex].Z(), vertices[workIndex].pos.Z(), planes[planeIndex].W()))))
+                * rnorm3df(planes[planeIndex].X(), planes[planeIndex].Y(), planes[planeIndex].Z())
+            < threshold
+        ? 1
+        : 0;
+
+    auto index = threadIdx.x / 32 + blockIdx.x;
+    auto bit = threadIdx.x % 32;
+
+    HUH::Uint32 bitfield = isInliner << bit;
+
+    atomicOr(inliners + index + gridDim.x * planeIndex, bitfield);
+
+    isInliner = warpReduceSum(isInliner);
+
+    if (threadIdx.x % 32 == 0) {
+        blockLocal[threadIdx.x / 32] = isInliner;
+    }
+
+    __syncthreads();
+
+    if (threadIdx.x < 32) {
+        HUH::Uint32 val = threadIdx.x < (blockDim.x + 31) / 32 ? blockLocal[threadIdx.x] : 0;
+        val = warpReduceSum(val);
+
+        if (threadIdx.x == 0) {
+            atomicAdd(&inlinersSum[planeIndex], val);
+        }
+    }
+}
+
+__global__ void PlaneMax(const HUH::Uint32* inlinersSum, const HUH::Uint32 iter, HUH::Uint32* indexMax) {
+
+    HUH::Uint32 threadMax = 0;
+    HUH::Uint32 threadIndex = 0;
+    auto workIndex = threadIdx.x + blockDim.x * blockIdx.x;
+    if (workIndex >= iter) {
+        return;
+    }
+
+    threadIndex = workIndex;
+    threadMax = inlinersSum[threadIndex];
+
+    __shared__ HUH::Uint32 maxBlock[32];
+    __shared__ HUH::Uint32 indexBlock[32];
+
+    for (int offset = 16; offset > 0; offset /= 2) {
+        auto upMax = __shfl_down_sync(0xffffffff, threadMax, offset);
+        auto upIndex = __shfl_down_sync(0xffffffff, threadIndex, offset);
+        if (upMax > threadMax) {
+            threadMax = upMax;
+            threadIndex = upIndex;
+        }
+    }
+
+    if (threadIdx.x % 32 == 0) {
+        maxBlock[threadIndex] = threadMax;
+        indexBlock[threadIndex] = threadIndex;
+    }
+
+    __syncthreads();
+
+    cuda::atomic_ref<HUH::Uint32, cuda::thread_scope_device> indexRef(indexMax[0]);
+    cuda::atomic_ref<HUH::Uint32, cuda::thread_scope_device> maxRef(indexMax[1]);
+
+    if (threadIdx.x < 32) {
+        HUH::Uint32 warpMax = threadIdx.x < (blockDim.x + 31) / 32 ? maxBlock[threadIdx.x] : 0;
+        HUH::Uint32 warpIndex = threadIdx.x < (blockDim.x + 31) / 32 ? indexBlock[threadIdx.x] : 0;
+        for (int offset = 16; offset > 0; offset /= 2) {
+            auto upMax = __shfl_down_sync(0xffffffff, warpMax, offset);
+            auto upIndex = __shfl_down_sync(0xffffffff, warpIndex, offset);
+
+            if (upMax > warpMax) {
+                warpMax = upMax;
+                warpIndex = upIndex;
+            }
+        }
+
+        if (threadIdx.x == 0) {
+            if (warpMax > maxRef) {
+                maxRef.store(warpMax);
+                indexRef.store(warpIndex);
+            }
+        }
+    }
+}
+
+__global__ void PlaneColor(LidarVertex* vertices,
+                           const HUH::Uint32 count,
+                           HUH::Vector4f color,
+                           const HUH::Uint32* inliners,
+                           const HUH::Uint32* indexMax) {
     auto workIndex = threadIdx.x + blockDim.x * blockIdx.x;
     if (workIndex >= count) {
         return;
     }
 
-    extern __shared__ HUH::Uint8 inliners[];
+    auto index = threadIdx.x / 32 + blockIdx.x;
+    auto bit = threadIdx.x % 32;
 
-    vertices[workIndex].color = color;
+    HUH::Uint32 bitfield = 1 << bit;
+    if ((*(inliners + index + gridDim.x * indexMax[0]) & bitfield) != 0) {
+        vertices[workIndex].color = color;
+    }
 }
 }

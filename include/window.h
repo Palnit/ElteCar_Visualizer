@@ -25,8 +25,8 @@ public:
         HUH::Vector2f texCoord;
     };
     struct LidarVertex {
-        HUH::Vector3f pos;
-        HUH::Vector3f color;
+        alignas(16) HUH::Vector4f pos;
+        alignas(16) HUH::Vector4f color;
     };
 
     struct CameraData {
@@ -63,11 +63,14 @@ private:
     HUH::Graphics::Camera m_camera;
     HUH::Vector2u32 m_viewportSize{1024, 720};
     size_t frame_index = 0;
+    HUH::Uint64 m_ransacIter = 200;
 
     HUH::Cuda::Device* m_cudaGpu = nullptr;
     HUH::Cuda::Module m_cudaModule;
-    HUH::Cuda::Function m_cudaLidarColor;
+    HUH::Cuda::Function m_cudaPlaneRansacSum;
     HUH::Cuda::Function m_cudaPlaneRng;
+    HUH::Cuda::Function m_cudaPlaneMax;
+    HUH::Cuda::Function m_cudaPlaneColor;
     HUH::Cuda::MemoryAllocator m_cudaMemoryAllocator;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;
@@ -101,6 +104,7 @@ private:
     HUH::RHI::Buffer* m_imVertexBuffer = nullptr;
     HUH::RHI::Buffer* m_imIndicesBuffer = nullptr;
 
+    std::vector<HUH::Uint32*> m_cudaInliners;
     std::vector<HUH::RHI::Buffer*> m_lidarVertexBuffers;
     std::vector<size_t> m_lidarSizes;
 
