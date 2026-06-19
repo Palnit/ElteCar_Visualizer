@@ -50,6 +50,7 @@ private:
     void RecordImageBufferCopy();
 
     HUH::Cuda::Function LoadCudaRNGFunction();
+    HUH::Cuda::Function LoadCudaEigFunction();
 
     std::vector<Vertex> m_imagePlane{{{0, -1.f, 1.f}, {0, 0}},
                                      {{0, 1.f, 1.f}, {1, 0}},
@@ -63,14 +64,18 @@ private:
     HUH::Graphics::Camera m_camera;
     HUH::Vector2u32 m_viewportSize{1024, 720};
     size_t frame_index = 0;
-    HUH::Uint64 m_ransacIter = 200;
+    HUH::Uint64 m_ransacIter = 10000;
 
     HUH::Cuda::Device* m_cudaGpu = nullptr;
     HUH::Cuda::Module m_cudaModule;
+    HUH::Cuda::Linker m_linker;
+    HUH::Cuda::Function m_cudaLidarMinMax;
     HUH::Cuda::Function m_cudaPlaneRansacSum;
     HUH::Cuda::Function m_cudaPlaneRng;
     HUH::Cuda::Function m_cudaPlaneMax;
     HUH::Cuda::Function m_cudaPlaneColor;
+    HUH::Cuda::Function m_cuda2DMap;
+    HUH::Cuda::Function m_cudaEig;
     HUH::Cuda::MemoryAllocator m_cudaMemoryAllocator;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;
@@ -104,7 +109,6 @@ private:
     HUH::RHI::Buffer* m_imVertexBuffer = nullptr;
     HUH::RHI::Buffer* m_imIndicesBuffer = nullptr;
 
-    std::vector<HUH::Uint32*> m_cudaInliners;
     std::vector<HUH::RHI::Buffer*> m_lidarVertexBuffers;
     std::vector<size_t> m_lidarSizes;
 
