@@ -29,6 +29,13 @@ public:
         alignas(16) HUH::Vector4f color;
     };
 
+    struct EigData {
+        alignas(16) HUH::Matrix4x4f mat{0};
+        alignas(16) HUH::Vector4f lambda{0};
+        float workspace[6];
+        int info;
+    };
+
     struct CameraData {
         HUH::Matrix4x4f view = HUH::Matrix4x4f::Identity();
         HUH::Matrix4x4f proj = HUH::Matrix4x4f::Identity();
@@ -64,7 +71,7 @@ private:
     HUH::Graphics::Camera m_camera;
     HUH::Vector2u32 m_viewportSize{1024, 720};
     size_t frame_index = 0;
-    HUH::Uint64 m_ransacIter = 10000;
+    HUH::Uint64 m_ransacIter = 20000;
 
     HUH::Cuda::Device* m_cudaGpu = nullptr;
     HUH::Cuda::Module m_cudaModule;
@@ -76,6 +83,7 @@ private:
     HUH::Cuda::Function m_cudaPlaneColor;
     HUH::Cuda::Function m_cuda2DMap;
     HUH::Cuda::Function m_cudaEig;
+    HUH::Cuda::Function m_cudaRecalcPlane;
     HUH::Cuda::MemoryAllocator m_cudaMemoryAllocator;
 
     HUH::RHI::DynamicRHI* m_rhi = nullptr;
@@ -98,6 +106,7 @@ private:
     HUH::RHI::Pipeline* m_lidarPipeline = nullptr;
 
     std::vector<std::vector<HUH::RHI::Buffer*>> m_imUniformModelBuffers;
+    std::vector<std::vector<HUH::RHI::Buffer*>> m_imUniformHomographyBuffers;
     std::vector<std::vector<HUH::RHI::Barrier*>> m_imBarrierDst;
     std::vector<std::vector<HUH::RHI::Barrier*>> m_imBarrierOpt;
 

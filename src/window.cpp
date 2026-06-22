@@ -124,6 +124,8 @@ int MainWindow::Run() {
     // m_linker.AddPtx("plane_ransac.ptx");
     m_linker.AddPtx("plane_ransac.ptx");
     m_linker.AddLib("libcusolverdx.a");
+    m_linker.AddLib("libcudadevrt.a");
+    // m_linker.AddLib("libcudart.so");
     m_linker.Complete();
     // m_linker.AddFatbin("libcusolverdx.fatbin");
     if (!m_cudaModule.Load(m_linker)) {
@@ -158,22 +160,24 @@ int MainWindow::Run() {
         if (!m_cudaEig) {
             HUH_WLOG(LogVisualizer, "Couldn't find random plane kernel")
         }
+        m_cudaRecalcPlane = m_cudaModule.GetFunction("RecalcPlane");
     }
 
     auto fence = m_gpu->CreateFence(2);
     auto fenceS = m_gpu->CreateFence(2);
     auto fenceS2 = m_gpu->CreateFence(2);
 
-    HUH::Vector4f* planes = nullptr;
-    HUH::Uint32* inlinerSums = nullptr;
-    HUH::Uint32* maxId = nullptr;
-    HUH::Vector4f* MinMax = nullptr;
-    HUH::Uint32* indices = nullptr;
-    HUH::Uint32* indicesNumber = nullptr;
-    HUH::Matrix4x4f* mat = nullptr;
-    float* lambda = nullptr;
-    float* workspace = nullptr;
-    int* info = nullptr;
+    HUH::Cuda::UniquePtr<EigData> planes;
+    HUH::Cuda::UniquePtr<EigData> planesFinalOut;
+    HUH::Cuda::UniquePtr<HUH::Uint32> inlinerSums;
+    HUH::Cuda::UniquePtr<HUH::Uint32> maxId;
+    HUH::Cuda::UniquePtr<HUH::Vector4f> MinMax;
+    HUH::Cuda::UniquePtr<HUH::Uint32> indices;
+    HUH::Cuda::UniquePtr<HUH::Uint32> indicesNumber;
+    // HUH::Matrix4x4f* mat = nullptr;
+    // float* lambda = nullptr;
+    // float* workspace = nullptr;
+    // int* info = nullptr;
 
     while (m_window.Loop()) {
         ReadImages();
@@ -200,8 +204,11 @@ int MainWindow::Run() {
             HUH::Matrix4x4f model = baseScale;
             model[3][1] += static_cast<float>(i) * scale * 2;
             model *= HUH::Matrix4x4f{{0, 0, 1, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}};
+            HUH::Matrix3x3f homography{1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f};
             m_imUniformModelBuffers[frame_index][i]->UploadData(&model);
+            m_imUniformHomographyBuffers[frame_index][i]->UploadData(&homography);
             (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformModelBuffers[frame_index][i]);
+            (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformHomographyBuffers[frame_index][i]);
             (*m_mainCommandPool)[frame_index]->BindSampledImage(m_imImageBuffers[frame_index][i]);
             (*m_mainCommandPool)[frame_index]->DrawIndexed(m_imageIndices.size(), 1);
         }
@@ -229,7 +236,7 @@ int MainWindow::Run() {
 
                 m_cudaLidarMinMax.SetSharedMemory(sizeof(HUH::Vector4f) * 64);
 
-                m_cudaLidarMinMax.Execute(ptr.Get(), m_lidarSizes[frame_index], MinMax);
+                m_cudaLidarMinMax.Execute(ptr.Get(), m_lidarSizes[frame_index], MinMax.Get());
 
                 cudaDeviceSynchronize();
                 float step = 0.5f;
@@ -251,21 +258,32 @@ int MainWindow::Run() {
                 cudaMemset(indices, 0, sizeof(HUH::Uint32) * m_lidarSizes[frame_index]);
                 cudaMemset(indicesNumber, 0, sizeof(HUH::Uint32));
 
-                m_cuda2DMap.Execute(ptr.Get(), m_lidarSizes[frame_index], MinMax, step, indices, indicesNumber);
+                m_cuda2DMap.Execute(ptr.Get(), m_lidarSizes[frame_index], MinMax.Get(), step, indices.Get(),
+                                    indicesNumber.Get());
 
                 HUH::Vector3i RandomGridSize = {static_cast<int>(m_ransacIter / 1024) + 1, 1, 1};
 
                 if (!planes) {
-                    cudaMalloc(&planes, m_ransacIter * sizeof(HUH::Vector4f));
+                    cudaMallocManaged(&planes, m_ransacIter * sizeof(EigData));
                 }
-                cudaMemset(planes, 0, m_ransacIter * sizeof(HUH::Vector4f));
-
+                cudaMemset(planes, 0, m_ransacIter * sizeof(EigData));
                 m_cudaPlaneRng.SetBlock(blockSize);
+
                 m_cudaPlaneRng.SetGrid(RandomGridSize);
 
-                m_cudaPlaneRng.Execute(ptr.Get(), static_cast<HUH::Uint32>(m_lidarSizes[frame_index]), planes,
-                                       static_cast<HUH::Uint64>(1234ULL), static_cast<HUH::Uint64>(1ULL), indices,
-                                       indicesNumber);
+                unsigned int sm = m_cudaGpu->Properties.Major * 100 + m_cudaGpu->Properties.Minor * 10;
+
+                m_cudaPlaneRng.Execute(ptr.Get(), static_cast<HUH::Uint32>(m_lidarSizes[frame_index]), planes.Get(),
+                                       static_cast<HUH::Uint64>(1234ULL), static_cast<HUH::Uint64>(1ULL), indices.Get(),
+                                       indicesNumber.Get(), sm);
+
+                HUH::Vector3i eigThreads = {32, 1, 1};
+                HUH::Vector3i eigBatches = {static_cast<int>((m_ransacIter + 32 - 1) / 32), 1, 1};
+
+                m_cudaEig.SetBlock(eigThreads);
+                m_cudaEig.SetGrid(eigBatches);
+                m_cudaEig.Execute(planes.Get(), m_ransacIter, sm);
+
                 //
                 // // for (int i = 0; i < 4; i++) {
                 // //     HUH_TLOG("Plane: {}", planes[i]);
@@ -280,11 +298,13 @@ int MainWindow::Run() {
                 }
                 cudaMemset(inlinerSums, 0, m_ransacIter * sizeof(HUH::Uint32));
 
+                float threshold = 0.1f;
+
                 m_cudaPlaneRansacSum.SetBlock(blockSize);
                 m_cudaPlaneRansacSum.SetGrid(LidarGridSize);
 
-                m_cudaPlaneRansacSum.Execute(ptr.Get(), static_cast<HUH::Uint32>(m_lidarSizes[frame_index]), planes,
-                                             inlinerSums, MinMax, 0.5f);
+                m_cudaPlaneRansacSum.Execute(ptr.Get(), static_cast<HUH::Uint32>(m_lidarSizes[frame_index]),
+                                             planes.Get(), inlinerSums.Get(), MinMax.Get(), threshold);
 
                 if (!maxId) {
                     cudaMallocManaged(&maxId, 2 * sizeof(HUH::Uint32));
@@ -297,44 +317,66 @@ int MainWindow::Run() {
                 m_cudaPlaneMax.SetBlock(blockSize);
                 m_cudaPlaneMax.SetGrid(maxGridSize);
 
-                m_cudaPlaneMax.Execute(inlinerSums, m_ransacIter, maxId);
-                if (!mat) {
-                    cudaMallocManaged(&mat, sizeof(HUH::Matrix4x4f));
-                    cudaMallocManaged(&lambda, sizeof(float) * 4);
-                    cudaMalloc(&workspace, sizeof(float) * 6);
-                    cudaMalloc(&info, sizeof(HUH::Uint32));
-                }
+                m_cudaPlaneMax.Execute(inlinerSums.Get(), m_ransacIter, maxId.Get());
 
-                cudaMemset(lambda, 0, sizeof(float) * 4);
-                cudaMemset(workspace, 0, sizeof(float) * 6);
-                cudaMemset(info, 0, sizeof(HUH::Uint32));
+                // if (!mat) {
+                //     cudaMallocManaged(&mat, sizeof(HUH::Matrix4x4f));
+                //     cudaMallocManaged(&lambda, sizeof(float) * 4);
+                //     cudaMalloc(&workspace, sizeof(float) * 6);
+                //     cudaMalloc(&info, sizeof(HUH::Uint32));
+                // }
 
-                auto test = HUH::Matrix4x4f({2, -1, -1, 0}, {-1, 3, -1, -1}, {-1, -1, 3, -1}, {0, -1, -1, 2});
+                // cudaMemset(lambda, 0, sizeof(float) * 4);
+                // cudaMemset(workspace, 0, sizeof(float) * 6);
+                // cudaMemset(info, 0, sizeof(HUH::Uint32));
 
-                cudaMemcpy(mat, &test, sizeof(HUH::Matrix4x4f), cudaMemcpyHostToDevice);
+                // auto test = HUH::Matrix4x4f({2, -1, -1, 0}, {-1, 3, -1, -1}, {-1, -1, 3, -1}, {0, -1, -1, 2});
 
-                HUH::Vector3i eigThreads{32, 1, 1};
-                HUH::Vector3i eigBlocks{1, 1, 1};
+                // cudaMemcpy(mat, &test, sizeof(HUH::Matrix4x4f), cudaMemcpyHostToDevice);
 
-                m_cudaEig.SetBlock(eigThreads);
-                m_cudaEig.SetGrid(eigBlocks);
-                m_cudaEig.Execute(mat, lambda, workspace, info);
+                // HUH::Vector3i eigThreads{32, 1, 1};
+                // HUH::Vector3i eigBlocks{1, 1, 1};
+
+                // m_cudaEig.SetBlock(eigThreads);
+                // m_cudaEig.SetGrid(eigBlocks);
+                // m_cudaEig.Execute(mat, lambda, workspace, info);
 
                 HUH::Vector3i LidarColorGridSize = {static_cast<int>(m_lidarSizes[frame_index] / 1024) + 1, 1, 1};
+
+                if (!planesFinalOut) {
+                    cudaMallocManaged(&planesFinalOut, sizeof(EigData));
+                }
+                cudaMemset(planes, 0, sizeof(EigData));
+                m_cudaRecalcPlane.SetBlock(blockSize);
+                m_cudaRecalcPlane.SetGrid(LidarColorGridSize);
+                m_cudaRecalcPlane.SetSharedMemory(sizeof(HUH::Matrix4x4f) * 32);
+
+                m_cudaRecalcPlane.Execute(ptr.Get(), planes.Get(), static_cast<HUH::Uint32>(m_lidarSizes[frame_index]),
+                                          planesFinalOut.Get(), maxId.Get(), threshold);
+
+                // cudaDeviceSynchronize();
+                //
+                // HUH_TLOG("Matrix Before: {}", planesFinalOut->mat);
+
+                HUH::Vector3i eigBatches2 = {1};
+
+                m_cudaEig.SetBlock(eigThreads);
+                m_cudaEig.SetGrid(eigBatches2);
+                m_cudaEig.Execute(planesFinalOut.Get(), m_ransacIter, sm);
+
+                // cudaDeviceSynchronize();
+                //
+                // HUH_TLOG("Matrix After: {}", planesFinalOut->mat);
 
                 m_cudaPlaneColor.SetBlock(blockSize);
                 m_cudaPlaneColor.SetGrid(LidarColorGridSize);
 
-                m_cudaPlaneColor.Execute(ptr.Get(), planes, static_cast<HUH::Uint32>(m_lidarSizes[frame_index]),
-                                         groundColor, maxId);
+                m_cudaPlaneColor.Execute(ptr.Get(), planesFinalOut.Get(),
+                                         static_cast<HUH::Uint32>(m_lidarSizes[frame_index]), groundColor, threshold);
 
                 // TODO Semaphores not working for some reason ? not signaling ? Algorithm fast enough
                 // syncronization Not a huge concern ?
                 cudaDeviceSynchronize();
-
-                HUH_TLOG("MAT: {}, ", mat->Transpose())
-                HUH_TLOG("EIG: {},{},{},{}", lambda[0], lambda[1], lambda[2], lambda[3]);
-                break;
 
                 // HUH_TLOG("Max ID: {} inlinerSum: {} Count {}", *maxId, inlinerSums[*maxId],
                 // m_lidarSizes[frame_index]);
@@ -362,23 +404,6 @@ int MainWindow::Run() {
         // break;
     }
     cudaDeviceSynchronize();
-
-    if (inlinerSums) {
-        cudaFree(inlinerSums);
-    }
-    if (maxId) {
-        cudaFree(maxId);
-    }
-    if (planes) {
-
-        cudaFree(planes);
-    }
-    if (MinMax) {
-        cudaFree(MinMax);
-    }
-    if (indices) {
-        cudaFree(indices);
-    }
 
     m_graphicsQueue->WaitIdle();
     m_rhi->Destroy();
@@ -463,6 +488,7 @@ void MainWindow::InitializePipeline() {
                         {
                             {HUH::RHI::Pipeline::DescriptorTypes::Uniform, 1, HUH::RHI::Shader::Stage::Vertex},
                             {HUH::RHI::Pipeline::DescriptorTypes::ImageSampler, 1, HUH::RHI::Shader::Stage::Fragment},
+                            {HUH::RHI::Pipeline::DescriptorTypes::Uniform, 1, HUH::RHI::Shader::Stage::Fragment},
                         },
                         false});
 
@@ -510,6 +536,7 @@ void MainWindow::InitializeUniformBuffers() {
         m_memoryAllocator->Allocate(cameraBuffer, HUH::RHI::MemoryAllocator::Device | HUH::RHI::MemoryAllocator::Host);
         m_lidarUniformModelBuffers.push_back(cameraBuffer);
         m_imUniformModelBuffers.emplace_back();
+        m_imUniformHomographyBuffers.emplace_back();
         m_imImageBuffers.emplace_back();
         m_imImagesTransferBuffer.emplace_back();
         m_imBarrierDst.emplace_back();
@@ -533,6 +560,12 @@ void MainWindow::ReadImages() {
             m_memoryAllocator->Allocate(modelBuffer,
                                         HUH::RHI::MemoryAllocator::Device | HUH::RHI::MemoryAllocator::Host);
             m_imUniformModelBuffers[frame_index].push_back(modelBuffer);
+
+            auto homographyBuffer =
+                m_imPipeline->CreateBuffer(HUH::RHI::Buffer::Type::UNIFORM, sizeof(HUH::Matrix3x3f), 2);
+            m_memoryAllocator->Allocate(homographyBuffer,
+                                        HUH::RHI::MemoryAllocator::Device | HUH::RHI::MemoryAllocator::Host);
+            m_imUniformHomographyBuffers[frame_index].push_back(homographyBuffer);
         }
         if (m_imImageBuffers[frame_index].size() < i + 1) {
             auto srcImageBuffer = m_imPipeline->CreateBuffer(
@@ -631,55 +664,9 @@ void MainWindow::RecordImageBufferCopy() {
 }
 
 HUH::Cuda::Function MainWindow::LoadCudaRNGFunction() {
-    switch (const auto sm = m_cudaGpu->Properties.Major * 100 + m_cudaGpu->Properties.Minor * 10) {
-        case 750:
-            return m_cudaModule.GetFunction("RandomPlane750");
-        case 800:
-            return m_cudaModule.GetFunction("RandomPlane800");
-        case 860:
-            return m_cudaModule.GetFunction("RandomPlane860");
-        case 870:
-            return m_cudaModule.GetFunction("RandomPlane870");
-        case 890:
-            return m_cudaModule.GetFunction("RandomPlane890");
-        case 900:
-            return m_cudaModule.GetFunction("RandomPlane900");
-        case 1000:
-            return m_cudaModule.GetFunction("RandomPlane1000");
-        case 1100:
-            return m_cudaModule.GetFunction("RandomPlane1100");
-        case 1200:
-            return m_cudaModule.GetFunction("RandomPlane1200");
-        case 1210:
-            return m_cudaModule.GetFunction("RandomPlane1210");
-        default:
-            return m_cudaModule.GetFunction("RandomPlane750");
-    }
+    return m_cudaModule.GetFunction("RandomPlane");
 }
 
 HUH::Cuda::Function MainWindow::LoadCudaEigFunction() {
-    switch (const auto sm = m_cudaGpu->Properties.Major * 100 + m_cudaGpu->Properties.Minor * 10) {
-        case 750:
-            return m_cudaModule.GetFunction("EigKernel750");
-        case 800:
-            return m_cudaModule.GetFunction("EigKernel800");
-        case 860:
-            return m_cudaModule.GetFunction("EigKernel860");
-        case 870:
-            return m_cudaModule.GetFunction("EigKernel870");
-        case 890:
-            return m_cudaModule.GetFunction("EigKernel890");
-        case 900:
-            return m_cudaModule.GetFunction("EigKernel900");
-        case 1000:
-            return m_cudaModule.GetFunction("EigKernel1000");
-        case 1100:
-            return m_cudaModule.GetFunction("EigKernel1100");
-        case 1200:
-            return m_cudaModule.GetFunction("EigKernel1200");
-        case 1210:
-            return m_cudaModule.GetFunction("EigKernel1210");
-        default:
-            return m_cudaModule.GetFunction("EigKernel750");
-    }
+    return m_cudaModule.GetFunction("EigKernel");
 }

@@ -65,8 +65,9 @@ add_executable(Visualizer
 )
 
 find_package(CUDA)
+find_package(CUDAToolkit)
 find_package(mathdx COMPONENTS curanddx cusolverdx CONFIG PATHS "${mathdx_SOURCE_DIR}/nvidia/mathdx/26.03/")
-if (CUDA_FOUND AND mathdx_FOUND)
+if (CUDA_FOUND AND mathdx_FOUND AND CUDAToolkit_FOUND)
     enable_language(CUDA)
     #    set(CMAKE_CUDA23_STANDARD_COMPILE_OPTION "-std=c++23")
     #    set(CMAKE_CUDA23_EXTENSION_COMPILE_OPTION "")
@@ -81,13 +82,21 @@ if (CUDA_FOUND AND mathdx_FOUND)
             PROPERTIES
             CUDA_SEPARABLE_COMPILATION ON)
     #    target_compile_options(CudaPtxFiles PRIVATE -dlto)
-    target_link_libraries(CudaPtxFiles PUBLIC HUH::Math mathdx::curanddx mathdx::cusolverdx)
+    target_compile_options(CudaPtxFiles PRIVATE -lcudadevrt)
+    #    set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
+    target_link_libraries(CudaPtxFiles PUBLIC
+            HUH::Math
+            mathdx::curanddx
+            mathdx::cusolverdx
+            CUDA::cudart
+    )
 
 
     add_custom_command(TARGET Visualizer POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy
             $<TARGET_OBJECTS:CudaPtxFiles>
             $<TARGET_OBJECTS:mathdx::cusolverdx>
+            $<TARGET_FILE:CUDA::cudart>
             ${CMAKE_CURRENT_BINARY_DIR}/
             COMMENT "Copying data"
     )
