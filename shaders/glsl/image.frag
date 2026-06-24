@@ -5,11 +5,14 @@ layout (location = 0) in vec2 fragTexCoord;
 layout (binding = 1) uniform sampler2D texSampler;
 
 layout (row_major, binding = 2) uniform Homography {
-    mat4 homography;
+    mat3 homography;
 } homography;
 
 layout (location = 0) out vec4 outColor;
 
 void main() {
-    outColor = texture(texSampler, fragTexCoord);
+    vec3 warpedCoord = vec3(fragTexCoord, 1.0) * homography.homography;
+    vec2 srcUV = warpedCoord.xy / warpedCoord.z;
+
+    outColor = texture(texSampler, srcUV);
 }

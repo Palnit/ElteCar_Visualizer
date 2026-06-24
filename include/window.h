@@ -112,6 +112,7 @@ private:
 
     std::vector<std::vector<HUH::RHI::Buffer*>> m_imImagesTransferBuffer;
     std::vector<std::vector<HUH::RHI::Image*>> m_imImageBuffers;
+    std::vector<HUH::RHI::Image*> m_imDepthImages;
 
     std::vector<HUH::RHI::Buffer*> m_lidarUniformModelBuffers;
 

@@ -192,24 +192,64 @@ int MainWindow::Run() {
         (*m_mainCommandPool)[frame_index]->SetClearColor({0.45f, 0.55f, 0.60f, 1.00f});
         (*m_mainCommandPool)[frame_index]->Begin();
         RecordImageBufferCopy();
-        (*m_mainCommandPool)[frame_index]->BeginRendering(m_imRenderPass, Image, {0, 0},
+        (*m_mainCommandPool)[frame_index]->BeginRendering(m_imRenderPass, Image, m_imDepthImages[frame_index], {0, 0},
                                                           {m_viewportSize.X(), m_viewportSize.Y() / 2});
         (*m_mainCommandPool)[frame_index]->BindPipeline(m_imPipeline);
         (*m_mainCommandPool)[frame_index]->BindVertexBuffer(m_imVertexBuffer, 0);
         (*m_mainCommandPool)[frame_index]->BindIndexBuffer(m_imIndicesBuffer);
-        auto scale = 1.f / static_cast<float>(m_imImageBuffers[frame_index].size());
-        HUH::Matrix4x4f baseScale({1, 0, 0, 0}, {0, scale, 0, 0}, {0, 0, 0.5, 0},
-                                  {0, -scale * static_cast<float>(m_imImageBuffers[frame_index].size() - 1), 0.5, 1});
+        // auto scale = 1.f / static_cast<float>(m_imImageBuffers[frame_index].size());
+        // HUH::Matrix4x4f baseScale({1, 0, 0, 0}, {0, scale, 0, 0}, {0, 0, 0.5, 0},
+        //                           {0, -scale * static_cast<float>(m_imImageBuffers[frame_index].size() - 1), 0.5,
+        //                           1});
+        // HUH::Matrix4x4f homography = HUH::Matrix4x4f::Identity();
+        // for (size_t i = 0; i < m_imImageBuffers[frame_index].size(); i++) {
+        //     HUH::Matrix4x4f model = baseScale;
+        //     model[3][1] += static_cast<float>(i) * scale * 2;
+        //     model *= HUH::Matrix4x4f{{0, 0, 1, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}};
+        //     m_imUniformModelBuffers[frame_index][i]->UploadData(&model);
+        //     m_imUniformHomographyBuffers[frame_index][i]->UploadData(&homography);
+        //     (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformModelBuffers[frame_index][i]);
+        //     (*m_mainCommandPool)[frame_index]->BindSampledImage(m_imImageBuffers[frame_index][i]);
+        //     (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformHomographyBuffers[frame_index][i]);
+        //     (*m_mainCommandPool)[frame_index]->DrawIndexed(m_imageIndices.size(), 1);
+        // }
+
+        HUH::Matrix4x4f baseScale({1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0.5, 0}, {0, 0, 0.5, 1});
+        HUH::Matrix4x4f homographySrc({1920, 0, 0, 0}, {0, 1200, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
+        HUH::Matrix4x4f homography[] = {{{-1.15886408e+01, -7.40765561e-01, 1.54558281e+04, 0},
+                                         {-1.37263965e+00, -8.69209266e+00, 5.00836700e+03, 0},
+                                         {-2.64091697e-03, -1.69324021e-03, 1.00000000e+00, 0},
+                                         {0, 0, 0, 1}},
+                                        HUH::Matrix4x4f::Identity(),
+                                        {{2.23346344e-01, 1.74415620e-02, 1.01825275e+03, 0},
+                                         {-2.61392048e-01, 7.89823806e-01, 1.76194614e+02, 0},
+                                         {-4.00609563e-04, -1.66843997e-05, 1.00000000e+00, 0},
+                                         {0, 0, 0, 1}},
+                                        {{-1.12505743e-01, 1.49066598e-01, 1.08328328e+03, 0},
+                                         {-6.75471579e-01, 1.36557666e+00, -2.95435237e+02, 0},
+                                         {-1.06532920e-03, -3.73955528e-05, 8.76229636e-01, 0},
+                                         {0, 0, 0, 1}}};
         for (size_t i = 0; i < m_imImageBuffers[frame_index].size(); i++) {
             HUH::Matrix4x4f model = baseScale;
-            model[3][1] += static_cast<float>(i) * scale * 2;
+            // model[3][1] += static_cast<float>(i) * scale * 2;
             model *= HUH::Matrix4x4f{{0, 0, 1, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}};
-            HUH::Matrix3x3f homography{1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f};
             m_imUniformModelBuffers[frame_index][i]->UploadData(&model);
-            m_imUniformHomographyBuffers[frame_index][i]->UploadData(&homography);
+            HUH::Matrix4x4f dst = {{static_cast<float>(m_window.GetSize().Width()), 0, 0, 0},
+                                   {0, static_cast<float>(m_window.GetSize().Height()) / 2.f, 0, 0},
+                                   {0, 0, 1, 0},
+                                   {0, 0, 0, 1}};
+            auto src = dst;
+            dst[0][0] *= 2;
+            HUH::Matrix4x4f translation({1, 0, -static_cast<float>(m_window.GetSize().Width()), 0}, {0, 1, 0, 0},
+                                        {0, 0, 1, 0}, {0, 0, 0, 1});
+            HUH::Matrix4x4f h = dst.GetInversed() * homography[i] /** translation*/ * src;
+            h.Inverse();
+            HUH_TLOG("WHAT: {}", h)
+            // h = HUH::Matrix4x4f::Identity();
+            m_imUniformHomographyBuffers[frame_index][i]->UploadData(&h);
             (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformModelBuffers[frame_index][i]);
-            (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformHomographyBuffers[frame_index][i]);
             (*m_mainCommandPool)[frame_index]->BindSampledImage(m_imImageBuffers[frame_index][i]);
+            (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformHomographyBuffers[frame_index][i]);
             (*m_mainCommandPool)[frame_index]->DrawIndexed(m_imageIndices.size(), 1);
         }
         (*m_mainCommandPool)[frame_index]->EndRendering();
@@ -422,6 +462,16 @@ void MainWindow::InitializeRenderPass() {
         .FinalLayout = HUH::RHI::RenderPass::Layout::Color,
     });
 
+    imSubPass.DepthAttachments = {
+        .AttachmentFormat = HUH::RHI::Format::D32_FLOAT_S8_UINT,
+        .ColorLoadOp = HUH::RHI::RenderPass::LoadOp::Clear,
+        .ColorStoreOp = HUH::RHI::RenderPass::StoreOp::DontCare,
+        .StencilLoadOp = HUH::RHI::RenderPass::LoadOp::Clear,
+        .StencilStoreOp = HUH::RHI::RenderPass::StoreOp::DontCare,
+        .InitialLayout = HUH::RHI::RenderPass::Layout::Unknown,
+        .FinalLayout = HUH::RHI::RenderPass::Layout::DepthStencil,
+    };
+
     HUH::RHI::RenderPass::SubPass lidarSubPass;
     lidarSubPass.ColorAttachments.push_back({
         .AttachmentFormat = m_swapchain->GetFormat(),
@@ -432,11 +482,14 @@ void MainWindow::InitializeRenderPass() {
     });
     m_imRenderPass->AddSubPass(imSubPass);
     m_lidarRenderPass->AddSubPass(lidarSubPass);
-    m_imRenderPass->AddDependency({.DstSubPassIndex = 0,
-                                   .SrcStageMask = HUH::RHI::Pipeline::Stages::ColorAttachmentOutput,
-                                   .DstStageMask = HUH::RHI::Pipeline::Stages::ColorAttachmentOutput,
-                                   .SrcAccessType = HUH::RHI::AccessType::Unknown,
-                                   .DstAccessType = HUH::RHI::AccessType::ColorWrite});
+    m_imRenderPass->AddDependency(
+        {.DstSubPassIndex = 0,
+         .SrcStageMask =
+             HUH::RHI::Pipeline::Stages::ColorAttachmentOutput | HUH::RHI::Pipeline::Stages::LateFragmentTests,
+         .DstStageMask =
+             HUH::RHI::Pipeline::Stages::ColorAttachmentOutput | HUH::RHI::Pipeline::Stages::EarlyFragmentTests,
+         .SrcAccessType = HUH::RHI::AccessType::DepthStencilWrite,
+         .DstAccessType = HUH::RHI::AccessType::ColorWrite | HUH::RHI::AccessType::DepthStencilWrite});
     m_lidarRenderPass->AddDependency({.DstSubPassIndex = 0,
                                       .SrcStageMask = HUH::RHI::Pipeline::Stages::ColorAttachmentOutput,
                                       .DstStageMask = HUH::RHI::Pipeline::Stages::ColorAttachmentOutput,
@@ -490,7 +543,7 @@ void MainWindow::InitializePipeline() {
                             {HUH::RHI::Pipeline::DescriptorTypes::ImageSampler, 1, HUH::RHI::Shader::Stage::Fragment},
                             {HUH::RHI::Pipeline::DescriptorTypes::Uniform, 1, HUH::RHI::Shader::Stage::Fragment},
                         },
-                        false});
+                        true});
 
     m_lidarPipeline->Init({m_lidarRenderPass,
                            lidarVertexFactory,
@@ -543,11 +596,25 @@ void MainWindow::InitializeUniformBuffers() {
         m_imBarrierOpt.emplace_back();
         m_lidarVertexBuffers.resize(2, nullptr);
         m_lidarSizes.resize(2, 0);
+
+        auto depthImage = m_imPipeline->CreateImage(HUH::RHI::Image::DeptStencil, m_window.GetSize());
+        m_memoryAllocator->Allocate(depthImage, HUH::RHI::MemoryAllocator::Device);
+        depthImage->Init({HUH::RHI::Format::D32_FLOAT_S8_UINT, 1, m_window.GetSize()});
+        m_imDepthImages.push_back(depthImage);
     }
 }
 
 void MainWindow::WindowResize(HUH::Window* win, HUH::Vector2u32 size) {
     m_viewportSize = size;
+
+    m_graphicsQueue->WaitIdle();
+    for (size_t i = 0; i < 2; ++i) {
+        m_imPipeline->DestroyImage(m_imDepthImages[i]);
+        auto depthImage = m_imPipeline->CreateImage(HUH::RHI::Image::DeptStencil, m_viewportSize);
+        m_memoryAllocator->Allocate(depthImage, HUH::RHI::MemoryAllocator::Device);
+        depthImage->Init({HUH::RHI::Format::D32_FLOAT_S8_UINT, 1, m_viewportSize});
+        m_imDepthImages[i] = depthImage;
+    }
 }
 
 void MainWindow::ReadImages() {
@@ -560,9 +627,10 @@ void MainWindow::ReadImages() {
             m_memoryAllocator->Allocate(modelBuffer,
                                         HUH::RHI::MemoryAllocator::Device | HUH::RHI::MemoryAllocator::Host);
             m_imUniformModelBuffers[frame_index].push_back(modelBuffer);
-
+        }
+        if (m_imImageBuffers[frame_index].size() < i + 1) {
             auto homographyBuffer =
-                m_imPipeline->CreateBuffer(HUH::RHI::Buffer::Type::UNIFORM, sizeof(HUH::Matrix3x3f), 2);
+                m_imPipeline->CreateBuffer(HUH::RHI::Buffer::Type::UNIFORM, sizeof(HUH::Matrix4x4f), 2);
             m_memoryAllocator->Allocate(homographyBuffer,
                                         HUH::RHI::MemoryAllocator::Device | HUH::RHI::MemoryAllocator::Host);
             m_imUniformHomographyBuffers[frame_index].push_back(homographyBuffer);
