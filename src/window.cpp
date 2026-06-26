@@ -216,7 +216,7 @@ int MainWindow::Run() {
 
         HUH::Matrix4x4f baseScale({1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0.5, 0}, {0, 0, 0.5, 1});
         HUH::Matrix4x4f homographySrc({1920, 0, 0, 0}, {0, 1200, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
-        HUH::Matrix4x4f homographyDst({1920 * 2, 0, 0, 0}, {0, 1200, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
+        HUH::Matrix4x4f homographyDst({1920 * 2.5, 0, 0, 0}, {0, 1200, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
         HUH::Matrix4x4f homography[] = {{{-1.15886408e+01, -7.40765561e-01, 1.54558281e+04, 0},
                                          {-1.37263965e+00, -8.69209266e+00, 5.00836700e+03, 0},
                                          {-2.64091697e-03, -1.69324021e-03, 1.00000000e+00, 0},
@@ -235,24 +235,17 @@ int MainWindow::Run() {
             // model[3][1] += static_cast<float>(i) * scale * 2;
             model *= HUH::Matrix4x4f{{0, 0, 1, 0}, {1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 0, 1}};
             m_imUniformModelBuffers[frame_index][i]->UploadData(&model);
-            auto aspect = static_cast<float>(1920) / static_cast<float>(1200);
-            auto planeAspect =
-                static_cast<float>(m_window.GetSize().Width()) / static_cast<float>(m_window.GetSize().Height());
-            HUH::Matrix4x4f dst = {{static_cast<float>(m_window.GetSize().Width()), 0, 0, 0},
-                                   {0, static_cast<float>(m_window.GetSize().Height()) / 2.f, 0, 0},
-                                   {0, 0, 1, 0},
-                                   {0, 0, 0, 1}};
-            auto src = dst;
-            // dst[0][0] *= 2;
-            HUH::Matrix4x4f translation({1, 0, 0 /*-static_cast<float>(m_window.GetSize().Width())*/, 0}, {0, 1, 0, 0},
-                                        {0, 0, 1, 0}, {0, 0, 0, 1});
-            HUH::Matrix4x4f scale({aspect / planeAspect, 0,
-                                   (1.0f - aspect / planeAspect) * 0.5f /*(1.0f - aspect / planeAspect) * 0.5f*/, 0},
-                                  {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
-            HUH::Matrix4x4f h = homographyDst.GetInversed() * homography[i] * homographySrc;
+            // auto aspect = static_cast<float>(1920) / static_cast<float>(1200);
+            // auto planeAspect =
+            //     static_cast<float>(m_window.GetSize().Width()) / static_cast<float>(m_window.GetSize().Height());
+            HUH::Matrix4x4f translation({1, 0, 0 + static_cast<float>(m_window.GetSize().Width()) / 3.f, 0},
+                                        {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
+            // HUH::Matrix4x4f scale({aspect / planeAspect, 0,
+            //                        (1.0f - aspect / planeAspect) * 0.5f /*(1.0f - aspect / planeAspect) * 0.5f*/, 0},
+            //                       {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1});
+            HUH::Matrix4x4f h = homographyDst.GetInversed() * translation * homography[i] * homographySrc;
             h.Inverse();
-            h = h * scale;
-            HUH_TLOG("WHAT: {}", h)
+            // h = h * scale;
             // h = HUH::Matrix4x4f::Identity();
             m_imUniformHomographyBuffers[frame_index][i]->UploadData(&h);
             (*m_mainCommandPool)[frame_index]->BindUniformBuffers(m_imUniformModelBuffers[frame_index][i]);
