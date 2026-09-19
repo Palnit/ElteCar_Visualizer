@@ -13,10 +13,16 @@
     },
     "implot",
     {
+      "name": "gtest"
+    },
+    "benchmark",
+    {
       "name": "libjpeg-turbo"
     },
     {
       "name": "libpng"
-    }
+    },
+    "rapidhash",
+    "args"
   ]
 }

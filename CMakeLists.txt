@@ -75,16 +75,14 @@ if (CUDA_FOUND AND mathdx_FOUND AND CUDAToolkit_FOUND)
     #    add_custom_target(plane_ransac ALL COMMAND ${CUDA_NVCC_EXECUTABLE}
     #            -ptx --std=c++23 -I/home/palnit/Desktop/code/ElteCar/ElteCar-Visualizer/lib/HUH/modules/Math/include/public/ -I/home/palnit/Desktop/code/ElteCar/ElteCar-Visualizer/lib/HUH/include/public/ ${CMAKE_CURRENT_SOURCE_DIR}/cuda_kernels/plane_ransac.cu SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cuda_kernels/plane_ransac.cu WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-    add_library(CudaPtxFiles OBJECT cuda_kernels/plane_ransac.cu)
-    set_property(TARGET CudaPtxFiles PROPERTY CUDA_PTX_COMPILATION ON)
+    add_library(CudaRansac OBJECT cuda_kernels/plane_ransac.cu)
+    set_property(TARGET CudaRansac PROPERTY CUDA_PTX_COMPILATION ON)
 
-    set_target_properties(CudaPtxFiles
+    set_target_properties(CudaRansac
             PROPERTIES
             CUDA_SEPARABLE_COMPILATION ON)
-    #    target_compile_options(CudaPtxFiles PRIVATE -dlto)
-    target_compile_options(CudaPtxFiles PRIVATE -lcudadevrt)
-    #    set(CMAKE_CUDA_RUNTIME_LIBRARY Static)
-    target_link_libraries(CudaPtxFiles PUBLIC
+    target_compile_options(CudaRansac PRIVATE -lcudadevrt)
+    target_link_libraries(CudaRansac PUBLIC
             HUH::Math
             mathdx::curanddx
             mathdx::cusolverdx
@@ -92,14 +90,8 @@ if (CUDA_FOUND AND mathdx_FOUND AND CUDAToolkit_FOUND)
     )
 
 
-    add_custom_command(TARGET Visualizer POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy
-            $<TARGET_OBJECTS:CudaPtxFiles>
-            $<TARGET_OBJECTS:mathdx::cusolverdx>
-            $<TARGET_FILE:CUDA::cudart>
-            ${CMAKE_CURRENT_BINARY_DIR}/
-            COMMENT "Copying data"
-    )
+    include(CudaPrototypes)
+    huh_create_prototype(TARGET CudaRansac)
 
 endif ()
 
@@ -112,6 +104,7 @@ target_link_libraries(Visualizer PRIVATE
         HUH::Graphics
         HUH::Cuda
         HUH::FileHandling::Image
+        CudaRansac-Gen
 )
 
 target_include_directories(Visualizer

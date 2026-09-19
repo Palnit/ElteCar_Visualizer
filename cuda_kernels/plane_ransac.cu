@@ -138,7 +138,7 @@ HUH_FORCE_INLINE __device__ float PlanePointDistance(const HUH::Vector4f& plane,
 
 extern "C" {
 
-__global__ void EigKernel(EigData* eigData, HUH::Uint32 batches, unsigned int sm) {
+__global__ void EigKernel(EigData* eigData, HUH::Uint64 batches, unsigned int sm) {
 
     const auto i = threadIdx.x + blockIdx.x * blockDim.x;
     if (i >= batches) {
@@ -247,7 +247,7 @@ __global__ void RandomPlane(LidarVertex* vertices,
     // planes[i].W() = -(planes->X() * poss[0].X() + planes->Y() * poss[0].Y() + planes->Z() * poss[0].Z());
 }
 
-__global__ void LidarMinMax(LidarVertex* vertices, HUH::Uint32 count, HUH::Vector4f* MinMax) {
+__global__ void LidarMinMax(LidarVertex* vertices, HUH::Uint64 count, HUH::Vector4f* MinMax) {
     HUH::Vector4f threadMax(-INFINITY);
     HUH::Vector4f threadMin(INFINITY);
 
@@ -309,7 +309,7 @@ __global__ void LidarMinMax(LidarVertex* vertices, HUH::Uint32 count, HUH::Vecto
 }
 
 __global__ void Lidar2DMap(LidarVertex* vertices,
-                           HUH::Uint32 count,
+                           HUH::Uint64 count,
                            HUH::Vector4f* MinMax,
                            float voxelSize,
                            HUH::Uint32* indices,
@@ -421,7 +421,7 @@ __global__ void PlaneRansacSum(HUH::Vector4f* vertices,
 
 __device__ int lock = 0;
 
-__global__ void PlaneMax(const HUH::Uint32* inlinersSum, const HUH::Uint32 iter, HUH::Uint32* indexMax) {
+__global__ void PlaneMax(const HUH::Uint32* inlinersSum, const HUH::Uint64 iter, HUH::Uint32* indexMax) {
 
     HUH::Uint32 threadMax = 0;
     HUH::Uint32 threadIndex = 0;

@@ -14,6 +14,8 @@
 #include <HUH/RHI/shader.h>
 #include <HUH/RHI/swapchain.h>
 
+#include <HUH/Cuda/Gen/CudaRansac.gen.h>
+
 #include <fstream>
 
 inline HUH::LogCategory AppLog("Application");
@@ -120,6 +122,7 @@ int MainWindow::Run() {
     connector.Down = HUH::KeyBindings::q;
 
     alignas(16) HUH::Vector4f groundColor(0, 0, 1, 1);
+    HUH::Cuda::Gen::CudaRansac::Initialize(m_cudaGpu);
     m_linker.Init(*m_cudaGpu);
     // m_linker.AddPtx("plane_ransac.ptx");
     m_linker.AddPtx("plane_ransac.ptx");
@@ -287,8 +290,8 @@ int MainWindow::Run() {
                                            static_cast<int>(diff.X() / step) + 1,
                                            static_cast<int>(diff.Y() / step) + 1};
 
-                m_cuda2DMap.SetBlock(blockSize);
-                m_cuda2DMap.SetGrid(map2dGrid);
+                // m_cuda2DMap.SetBlock(blockSize);
+                // m_cuda2DMap.SetGrid(map2dGrid);
 
                 if (!indices) {
                     cudaMallocManaged(&indices, sizeof(HUH::Uint32) * m_lidarSizes[frame_index]);
@@ -299,8 +302,10 @@ int MainWindow::Run() {
                 cudaMemset(indices, 0, sizeof(HUH::Uint32) * m_lidarSizes[frame_index]);
                 cudaMemset(indicesNumber, 0, sizeof(HUH::Uint32));
 
-                m_cuda2DMap.Execute(ptr.Get(), m_lidarSizes[frame_index], MinMax.Get(), step, indices.Get(),
-                                    indicesNumber.Get());
+                HUH::Cuda::Gen::CudaRansac::Lidar2DMap(map2dGrid, blockSize, ptr.Get(), m_lidarSizes[frame_index],
+                                                       MinMax.Get(), step, indices.Get(), indicesNumber.Get());
+                // m_cuda2DMap.Execute(ptr.Get(), m_lidarSizes[frame_index], MinMax.Get(), step, indices.Get(),
+                // indicesNumber.Get());
 
                 HUH::Vector3i RandomGridSize = {static_cast<int>(m_ransacIter / 1024) + 1, 1, 1};
 
@@ -371,7 +376,8 @@ int MainWindow::Run() {
                 // cudaMemset(workspace, 0, sizeof(float) * 6);
                 // cudaMemset(info, 0, sizeof(HUH::Uint32));
 
-                // auto test = HUH::Matrix4x4f({2, -1, -1, 0}, {-1, 3, -1, -1}, {-1, -1, 3, -1}, {0, -1, -1, 2});
+                // auto test = HUH::Matrix4x4f({2, -1, -1, 0}, {-1, 3, -1, -1}, {-1, -1, 3, -1}, {0,
+                // -1, -1, 2});
 
                 // cudaMemcpy(mat, &test, sizeof(HUH::Matrix4x4f), cudaMemcpyHostToDevice);
 
@@ -415,8 +421,8 @@ int MainWindow::Run() {
                 m_cudaPlaneColor.Execute(ptr.Get(), planesFinalOut.Get(),
                                          static_cast<HUH::Uint32>(m_lidarSizes[frame_index]), groundColor, threshold);
 
-                // TODO Semaphores not working for some reason ? not signaling ? Algorithm fast enough
-                // syncronization Not a huge concern ?
+                // TODO Semaphores not working for some reason ? not signaling ? Algorithm fast
+                // enough syncronization Not a huge concern ?
                 cudaDeviceSynchronize();
 
                 // HUH_TLOG("Max ID: {} inlinerSum: {} Count {}", *maxId, inlinerSums[*maxId],
@@ -435,10 +441,10 @@ int MainWindow::Run() {
         }
         (*m_mainCommandPool)[frame_index]->EndRendering();
         (*m_mainCommandPool)[frame_index]->End();
-        std::vector<HUH::RHI::Queue::WaitFence> waitFences;
-        std::vector<HUH::RHI::Fence*> signal;
-        waitFences.emplace_back(fenceS[frame_index], HUH::RHI::Pipeline::Stages::ColorAttachmentOutput);
-        signal.push_back(fenceS2[frame_index]);
+        HUH::Array<HUH::RHI::Queue::WaitFence> waitFences;
+        HUH::Array<HUH::RHI::Fence*> signal;
+        waitFences.Emplace(fenceS[frame_index], HUH::RHI::Pipeline::Stages::ColorAttachmentOutput);
+        signal.Emplace(fenceS2[frame_index]);
         m_graphicsQueue->Submit((*m_mainCommandPool)[frame_index], waitFences, signal, fence[frame_index]);
         m_swapchain->Present(m_graphicsQueue, fenceS2[frame_index]);
         frame_index = (frame_index + 1) % 2;
@@ -455,7 +461,7 @@ void MainWindow::InitializeRenderPass() {
     m_imRenderPass = m_gpu->CreateRenderPass();
     m_lidarRenderPass = m_gpu->CreateRenderPass();
     HUH::RHI::RenderPass::SubPass imSubPass;
-    imSubPass.ColorAttachments.push_back({
+    imSubPass.ColorAttachments.Emplace({
         .AttachmentFormat = m_swapchain->GetFormat(),
         .ColorLoadOp = HUH::RHI::RenderPass::LoadOp::Clear,
         .ColorStoreOp = HUH::RHI::RenderPass::StoreOp::Store,
@@ -474,7 +480,7 @@ void MainWindow::InitializeRenderPass() {
     };
 
     HUH::RHI::RenderPass::SubPass lidarSubPass;
-    lidarSubPass.ColorAttachments.push_back({
+    lidarSubPass.ColorAttachments.Emplace({
         .AttachmentFormat = m_swapchain->GetFormat(),
         .ColorLoadOp = HUH::RHI::RenderPass::LoadOp::Clear,
         .ColorStoreOp = HUH::RHI::RenderPass::StoreOp::Store,
