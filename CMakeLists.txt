@@ -26,7 +26,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_compile_options(-O0)
+add_compile_options(-O3)
 
 
 set(PROJECT_SOURCES
@@ -49,7 +49,6 @@ set(RESOURCES
         shaders/lidar_vert.spv
 )
 
-set(ENV{NINJA_STATUS} "[%p ] ")
 
 set(BUILD_GRAPHICS_CAMERA ON)
 set(BUILD_MATH ON)
