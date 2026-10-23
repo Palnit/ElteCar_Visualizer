@@ -8,7 +8,7 @@ FetchContent_Declare(vcpkg
 FetchContent_MakeAvailable(vcpkg)
 
 FetchContent_Declare(mathdx
-        URL "https://developer.nvidia.com/downloads/compute/cuRANDDx/redist/cuRANDDx/cuda13/nvidia-mathdx-26.03.0-cuda13.tar.gz"
+        URL "https://developer.nvidia.com/downloads/compute/cublasdx/redist/cublasdx/cuda13/nvidia-mathdx-26.06.1-cuda13.tar.gz"
         DOWNLOAD_EXTRACT_TIMESTAMP NEW
 )
 FetchContent_MakeAvailable(mathdx)
@@ -63,10 +63,12 @@ add_executable(Visualizer
         ${HEADER_FILES}
 )
 
-find_package(CUDA)
+include(CheckLanguage)
+
+check_language(CUDA)
 find_package(CUDAToolkit)
-find_package(mathdx COMPONENTS curanddx cusolverdx CONFIG PATHS "${mathdx_SOURCE_DIR}/nvidia/mathdx/26.03/")
-if (CUDA_FOUND AND mathdx_FOUND AND CUDAToolkit_FOUND)
+find_package(mathdx COMPONENTS curanddx cusolverdx CONFIG PATHS "${mathdx_SOURCE_DIR}/nvidia/mathdx/26.06/")
+if (CMAKE_CUDA_COMPILER AND mathdx_FOUND AND CUDAToolkit_FOUND)
     enable_language(CUDA)
     #    set(CMAKE_CUDA23_STANDARD_COMPILE_OPTION "-std=c++23")
     #    set(CMAKE_CUDA23_EXTENSION_COMPILE_OPTION "")
